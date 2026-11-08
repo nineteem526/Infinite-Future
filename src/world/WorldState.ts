@@ -1,17 +1,37 @@
+import { initialCausality, reduceCausality } from '../m2/causality';
+import type { CausalityState, InteractionAction, InteractionOutcome } from '../m2/types';
 import type { EraId } from './types';
 
 /**
- * Deterministic game state shared by all systems. M1 only needs the active
- * era and its switch serial; later milestones add flags, unique items and
- * causal state here so every system communicates through one authority.
+ * Deterministic game state shared by all systems: the active era, the M1
+ * serial/flags and the M2 causal chain. Every item/mechanism change goes
+ * through applyInteraction, which delegates to the pure reducer; no other
+ * system may mutate causal state.
  */
 export class WorldState {
   private era: EraId;
   private serial = 0;
+  private causalityState: CausalityState = initialCausality();
   private readonly flags = new Map<string, boolean>();
 
   constructor(initialEra: EraId = '2026') {
     this.era = initialEra;
+  }
+
+  get causality(): Readonly<CausalityState> {
+    return this.causalityState;
+  }
+
+  applyInteraction(action: InteractionAction, era: EraId): InteractionOutcome {
+    const result = reduceCausality(this.causalityState, action, { era });
+    if (result.outcome.changed) {
+      this.causalityState = result.state;
+    }
+    return result.outcome;
+  }
+
+  resetCausality(): void {
+    this.causalityState = initialCausality();
   }
 
   get currentEra(): EraId {
@@ -37,11 +57,17 @@ export class WorldState {
     this.flags.set(name, value);
   }
 
-  snapshot(): { era: EraId; serial: number; flags: Record<string, boolean> } {
+  snapshot(): {
+    era: EraId;
+    serial: number;
+    flags: Record<string, boolean>;
+    causality: CausalityState;
+  } {
     return {
       era: this.era,
       serial: this.serial,
       flags: Object.fromEntries(this.flags),
+      causality: this.causalityState,
     };
   }
 }

@@ -11,6 +11,8 @@ import {
 } from '../core/constants';
 import { Ambience } from '../audio/Ambience';
 import { Input } from '../input/Input';
+import { CausalitySystem } from '../m2/CausalitySystem';
+import { createM2Content, type M2Content } from '../m2/content';
 import { Player, type PlayerSpawn } from '../player/Player';
 import { Physics } from '../physics/Physics';
 import { TimeShift } from '../time/TimeShift';
@@ -44,6 +46,8 @@ export class Game {
   readonly input: Input;
   readonly hud: Hud;
   readonly timeShift: TimeShift;
+  readonly m2Content: M2Content;
+  readonly causality: CausalitySystem;
 
   private readonly spawn: PlayerSpawn = {
     position: { ...DEFAULT_SPAWN },
@@ -132,6 +136,23 @@ export class Game {
       this.audio,
     );
 
+    // M2 causal chain: pre-built content, then the controller that binds
+    // WorldState actions to visuals and dynamic collision.
+    this.scene.add(this.player.camera);
+    this.m2Content = createM2Content({
+      eras: this.eras,
+      physics: this.physics,
+      camera: this.player.camera,
+    });
+    this.causality = new CausalitySystem({
+      worldState: this.worldState,
+      player: this.player,
+      timeShift: this.timeShift,
+      hud: this.hud,
+      content: this.m2Content,
+      spawn: this.spawn,
+    });
+
     window.addEventListener('resize', this.handleResize);
     this.handleResize();
 
@@ -218,14 +239,25 @@ export class Game {
   };
 
   private fixedUpdate(dt: number): void {
+    // Deterministic order: reset, then era transactions, then interactions, then
+    // movement. Reset teleports to spawn before requesting the initial era.
+    while (this.input.consumeReset()) {
+      this.causality.resetRun();
+    }
+
     // Queued E presses are drained in order; each request is a full transaction.
     while (this.input.consumeSwitch()) {
       this.timeShift.request(otherEra(this.worldState.currentEra));
     }
 
+    while (this.input.consumeInteract()) {
+      this.causality.interact();
+    }
+
     this.player.update(dt, this.input, this.worldState.currentEra);
     this.physics.step(dt);
     this.player.afterPhysicsStep();
+    this.causality.tick();
 
     if (this.player.position.y < VOID_Y) {
       this.player.teleport(

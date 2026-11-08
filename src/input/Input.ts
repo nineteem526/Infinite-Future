@@ -18,6 +18,8 @@ export class Input {
   private readonly keys = new Set<string>();
   private switchQueued = 0;
   private jumpQueued = 0;
+  private interactQueued = 0;
+  private resetQueued = 0;
   private lookX = 0;
   private lookY = 0;
   private lookEventsAllowed = false;
@@ -62,8 +64,24 @@ export class Input {
     return true;
   }
 
+  consumeInteract(): boolean {
+    if (this.interactQueued <= 0) return false;
+    this.interactQueued -= 1;
+    return true;
+  }
+
+  consumeReset(): boolean {
+    if (this.resetQueued <= 0) return false;
+    this.resetQueued -= 1;
+    return true;
+  }
+
   get queuedSwitches(): number {
     return this.switchQueued;
+  }
+
+  get queuedInteractions(): number {
+    return this.interactQueued;
   }
 
   requestPointerLock(): void {
@@ -92,6 +110,14 @@ export class Input {
       } else if (event.code === 'KeyE') {
         event.preventDefault();
         if (!event.repeat) this.switchQueued += 1;
+      } else if (event.code === 'KeyF') {
+        event.preventDefault();
+        if (!event.repeat) this.interactQueued += 1;
+      } else if (event.code === 'KeyR') {
+        // Never hijack browser reload (Ctrl/Cmd+R) or other modified shortcuts.
+        if (event.ctrlKey || event.metaKey) return;
+        event.preventDefault();
+        if (!event.repeat) this.resetQueued += 1;
       }
     };
 

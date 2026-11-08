@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 import type { PoseSnapshot } from '../core/types';
 import type { Game } from '../core/Game';
+import type { PresentationSnapshot } from '../m2/CausalitySystem';
+import { M2_TARGETS } from '../m2/layout';
+import {
+  CRYSTAL_ITEM_ID,
+  type CausalityState,
+  type InteractionOutcome,
+  type InteractionTarget,
+  type ObjectiveView,
+} from '../m2/types';
 import { type EraId } from '../world/types';
 
 export interface M1TestState {
@@ -30,6 +39,9 @@ export interface M1TestState {
     hint: string;
     toast: string;
     overlayVisible: boolean;
+    objective: string;
+    held: string;
+    interactionPrompt: string;
   };
   render: {
     calls: number;
@@ -42,6 +54,28 @@ export interface M1TestState {
   };
   queuedSwitches: number;
   errors: string[];
+}
+
+export interface M2TestState extends M1TestState {
+  causality: CausalityState;
+  heldItemId: string | null;
+  crystalItemId: string;
+  objective: ObjectiveView;
+  objectiveStatus: string;
+  interactionPromptText: string | null;
+  presentation: PresentationSnapshot;
+  interactionTargets: readonly InteractionTarget[];
+  gateCollision: {
+    era: '2126';
+    colliderHandle: number;
+    closed: boolean;
+    blocksMovement: boolean;
+  };
+  m2Colliders: {
+    static2026: number;
+    static2126: number;
+    gateHandle: number;
+  };
 }
 
 export interface ObstructionProbe {
@@ -60,10 +94,19 @@ export interface M1TestApi {
   probe(era: EraId, x: number, y: number, z: number): ObstructionProbe;
 }
 
+export interface M2TestApi extends M1TestApi {
+  state(): M2TestState;
+  interact(): InteractionOutcome | null;
+  resetRun(): void;
+  objective(): ObjectiveView;
+  interactionPrompt(): string | null;
+}
+
 declare global {
   interface Window {
     __M1_READY__?: boolean;
     __M1_TEST__?: M1TestApi;
+    __M2_TEST__?: M2TestApi;
   }
 }
 
@@ -73,8 +116,8 @@ function colorHex(color: THREE.ColorRepresentation | THREE.Color | THREE.Texture
 
 /**
  * Browser acceptance helper, installed only when the page is opened with
- * `?test=1`. It exposes deterministic state and synthetic input so the
- * acceptance owner can script real-browser checks without a custom client.
+ * `?test=1`. Exposed as both `__M2_TEST__` and (M1-compatible) `__M1_TEST__`;
+ * all checks run against the real game loop, physics and WorldState.
  */
 export function installTestApi(game: Game, errors: string[]): void {
   const params = new URLSearchParams(window.location.search);
@@ -94,15 +137,20 @@ export function installTestApi(game: Game, errors: string[]): void {
     );
   };
 
-  const api: M1TestApi = {
-    state(): M1TestState {
+  const api: M2TestApi = {
+    state(): M2TestState {
       const era = game.worldState.currentEra;
       const eraObj = game.eras.get(era);
       const fog = game.scene.fog;
       const badge = document.querySelector('.era-badge-title')?.textContent ?? '';
       const hint = document.querySelector('.hint')?.textContent ?? '';
+      const objectiveTitle = document.querySelector('.objective-title')?.textContent ?? '';
+      const objectiveStatusText = document.querySelector('.objective-status')?.textContent ?? '';
+      const heldText = document.querySelector('.held')?.textContent ?? '';
+      const promptText = document.querySelector('.interact-prompt')?.textContent ?? '';
       const visibleEra = [...game.eras.values()].find((candidate) => candidate.group.visible)?.id ?? null;
       const stats = game.renderStats();
+      const causality = game.worldState.causality;
       return {
         ready: window.__M1_READY__ === true,
         era,
@@ -125,6 +173,9 @@ export function installTestApi(game: Game, errors: string[]): void {
           hint,
           toast: game.hud.currentToastText(),
           overlayVisible: game.hud.isOverlayVisible,
+          objective: objectiveTitle,
+          held: heldText,
+          interactionPrompt: promptText,
         },
         render: stats,
         colliders: {
@@ -133,6 +184,28 @@ export function installTestApi(game: Game, errors: string[]): void {
         },
         queuedSwitches: game.input.queuedSwitches,
         errors: [...errors],
+        causality,
+        heldItemId: causality.crystal.kind === 'inventory' ? CRYSTAL_ITEM_ID : null,
+        crystalItemId: CRYSTAL_ITEM_ID,
+        objective: game.causality.objective(),
+        objectiveStatus: objectiveStatusText,
+        interactionPromptText: promptText.length > 0 ? promptText : null,
+        presentation: game.causality.presentation(),
+        interactionTargets: M2_TARGETS,
+        gateCollision: (() => {
+          const gate = game.causality.gateCollision();
+          return {
+            era: gate.era,
+            colliderHandle: gate.colliderHandle,
+            closed: gate.closed,
+            blocksMovement: gate.blocksMovement,
+          };
+        })(),
+        m2Colliders: {
+          static2026: game.m2Content.staticSolids2026,
+          static2126: game.m2Content.staticSolids2126,
+          gateHandle: game.m2Content.gateColliderHandle,
+        },
       };
     },
 
@@ -149,6 +222,17 @@ export function installTestApi(game: Game, errors: string[]): void {
     switchEra(): void {
       press('KeyE');
       release('KeyE');
+    },
+
+    interact(): InteractionOutcome | null {
+      // Direct path through the same CausalitySystem used by the game loop.
+      // For synthetic input-path checks use press('KeyF') + step().
+      return game.causality.interact();
+    },
+
+    resetRun(): void {
+      // Direct reset; press('KeyR') exercises the queued input path instead.
+      game.causality.resetRun();
     },
 
     teleport(x: number, y: number, z: number, yaw?: number, pitch?: number): void {
@@ -175,7 +259,16 @@ export function installTestApi(game: Game, errors: string[]): void {
     probe(era: EraId, x: number, y: number, z: number): ObstructionProbe {
       return game.physics.isCapsuleObstructed(era, { x, y, z });
     },
+
+    objective(): ObjectiveView {
+      return game.causality.objective();
+    },
+
+    interactionPrompt(): string | null {
+      return game.causality.promptForCurrentPosition();
+    },
   };
 
+  window.__M2_TEST__ = api;
   window.__M1_TEST__ = api;
 }

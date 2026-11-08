@@ -1,3 +1,4 @@
+import type { ObjectiveView } from '../m2/types';
 import type { EraId } from '../world/types';
 import type { HudPort } from '../time/TimeShift';
 
@@ -16,6 +17,12 @@ export class Hud implements HudPort {
   private readonly badge: HTMLDivElement;
   private readonly badgeTitle: HTMLSpanElement;
   private readonly badgeSubtitle: HTMLSpanElement;
+  private readonly objectivePanel: HTMLDivElement;
+  private readonly objectiveEyebrow: HTMLSpanElement;
+  private readonly objectiveTitle: HTMLDivElement;
+  private readonly objectiveStatus: HTMLDivElement;
+  private readonly held: HTMLDivElement;
+  private readonly interactionPrompt: HTMLDivElement;
   private readonly hint: HTMLDivElement;
   private readonly toast: HTMLDivElement;
   private readonly stats: HTMLDivElement;
@@ -42,6 +49,24 @@ export class Hud implements HudPort {
     this.badgeSubtitle.className = 'era-badge-subtitle';
     this.badge.append(badgeLabel, this.badgeTitle, this.badgeSubtitle);
 
+    this.objectivePanel = document.createElement('div');
+    this.objectivePanel.className = 'objective';
+    this.objectiveEyebrow = document.createElement('span');
+    this.objectiveEyebrow.className = 'objective-eyebrow';
+    this.objectiveEyebrow.textContent = '目标 1 / 4';
+    this.objectiveTitle = document.createElement('div');
+    this.objectiveTitle.className = 'objective-title';
+    this.objectiveStatus = document.createElement('div');
+    this.objectiveStatus.className = 'objective-status';
+    this.objectivePanel.append(this.objectiveEyebrow, this.objectiveTitle, this.objectiveStatus);
+
+    this.held = document.createElement('div');
+    this.held.className = 'held';
+    this.held.textContent = '手持：空';
+
+    this.interactionPrompt = document.createElement('div');
+    this.interactionPrompt.className = 'interact-prompt';
+
     this.hint = document.createElement('div');
     this.hint.className = 'hint';
 
@@ -57,16 +82,18 @@ export class Hud implements HudPort {
     this.overlay.className = 'overlay';
     this.overlay.innerHTML = `
       <div class="overlay-card">
-        <p class="overlay-eyebrow">INFINITE FUTURE · M1 原型</p>
-        <h1 class="overlay-title">双时代几何测试场</h1>
+        <p class="overlay-eyebrow">INFINITE FUTURE · M2 因果原型</p>
+        <h1 class="overlay-title">双时代因果测试场</h1>
         <p class="overlay-subtitle">2026 暖金广场 &nbsp;/&nbsp; 2126 铅灰废墟</p>
         <ul class="overlay-controls">
           <li><span class="key">W A S D</span><span>移动</span></li>
           <li><span class="key">鼠标</span><span>观察（点击后锁定）</span></li>
           <li><span class="key">空格</span><span>跳跃</span></li>
           <li><span class="key">E</span><span>切换时代（保持位置、视角、速度）</span></li>
+          <li><span class="key">F</span><span>拾取 / 放入 / 操作机关</span></li>
+          <li><span class="key">R</span><span>重置因果链</span></li>
         </ul>
-        <p class="overlay-note">两个时代已预加载，切换不加载资源、不刷新页面。目标位置被障碍占据时切换会被拒绝。</p>
+        <p class="overlay-note">两个时代已预加载，切换不加载资源、不刷新页面。目标位置被障碍占据时切换会被拒绝；能源晶体是唯一物品，切换、拒绝与重置都不会复制或丢失它。</p>
         <button type="button" class="enter-button">点击进入测试场</button>
       </div>
     `;
@@ -79,7 +106,10 @@ export class Hud implements HudPort {
     this.root.append(
       this.crosshair,
       this.badge,
+      this.objectivePanel,
       this.hint,
+      this.interactionPrompt,
+      this.held,
       this.toast,
       this.stats,
       this.overlay,
@@ -99,8 +129,32 @@ export class Hud implements HudPort {
 
   setPointerLocked(locked: boolean): void {
     this.hint.textContent = locked
-      ? 'WASD 移动 · 鼠标 观察 · 空格 跳跃 · E 切换时代 · Esc 释放鼠标'
-      : '点击画面锁定鼠标 · WASD 移动 · 空格 跳跃 · E 切换时代';
+      ? 'WASD 移动 · 鼠标 观察 · 空格 跳跃 · E 切换 · F 交互 · R 重置 · Esc 释放鼠标'
+      : '点击画面锁定鼠标 · WASD 移动 · 空格 跳跃 · E 切换 · F 交互 · R 重置';
+  }
+
+  /** Renders the data-driven M2 objective; called only when text changes. */
+  setObjective(objective: ObjectiveView, status: string): void {
+    this.objectivePanel.classList.toggle('done', objective.done);
+    this.objectiveEyebrow.textContent = objective.done
+      ? '因果链完成'
+      : `目标 ${objective.step} / ${objective.total}`;
+    this.objectiveTitle.textContent = objective.title;
+    this.objectiveStatus.textContent = status;
+  }
+
+  setHeld(text: string): void {
+    this.held.textContent = text;
+  }
+
+  setInteractionPrompt(text: string | null): void {
+    if (text === null) {
+      this.interactionPrompt.textContent = '';
+      this.interactionPrompt.classList.remove('visible');
+      return;
+    }
+    this.interactionPrompt.textContent = text;
+    this.interactionPrompt.classList.add('visible');
   }
 
   setStats(fps: number): void {

@@ -45,16 +45,21 @@ function geometryFor(solid: SolidSpec): THREE.BufferGeometry {
   }
 }
 
+/** Builds the primitive visual that mirrors one registered structural collider. */
+export function createSolidVisual(solid: SolidSpec): THREE.Mesh {
+  const mesh = new THREE.Mesh(geometryFor(solid), standardMaterial(solid));
+  mesh.position.set(...solid.position);
+  if (solid.rotation) mesh.rotation.set(...solid.rotation);
+  mesh.castShadow = solid.castShadow ?? true;
+  mesh.receiveShadow = solid.receiveShadow ?? true;
+  mesh.name = `solid-${solid.kind}`;
+  return mesh;
+}
+
 /** Builds the primitive visuals that mirror the registered structural colliders. */
 export function addSolidVisuals(group: THREE.Group, solids: readonly SolidSpec[]): void {
   for (const solid of solids) {
-    const mesh = new THREE.Mesh(geometryFor(solid), standardMaterial(solid));
-    mesh.position.set(...solid.position);
-    if (solid.rotation) mesh.rotation.set(...solid.rotation);
-    mesh.castShadow = solid.castShadow ?? true;
-    mesh.receiveShadow = solid.receiveShadow ?? true;
-    mesh.name = `solid-${solid.kind}`;
-    group.add(mesh);
+    group.add(createSolidVisual(solid));
   }
 }
 

@@ -48,6 +48,8 @@ export class Player {
 
   private jumpBuffer = 0;
   private readonly physics: Physics;
+  /** Optional M2 extension: extra obstacles (e.g. the causal future gate). */
+  private extraObstacleFilter: ((collider: RAPIER.Collider, era: EraId) => boolean) | null = null;
 
   constructor(physics: Physics, spawn: PlayerSpawn) {
     this.physics = physics;
@@ -105,12 +107,20 @@ export class Player {
       z: this.velocity.z * dt,
     };
 
+    const eraFilter = this.physics.filterForEra(era);
+    const extraFilter = this.extraObstacleFilter;
+    // Default M1 behavior is unchanged (null => era filter only). M2 composes a
+    // dynamic obstacle predicate so causal collisions stay synchronous.
+    const obstacleFilter: (collider: RAPIER.Collider) => boolean = extraFilter === null
+      ? eraFilter
+      : (collider) => eraFilter(collider) || extraFilter(collider, era);
+
     this.physics.controller.computeColliderMovement(
       this.collider,
       desired,
       undefined,
       undefined,
-      this.physics.filterForEra(era),
+      obstacleFilter,
     );
     const movement = this.physics.controller.computedMovement();
 
@@ -157,6 +167,13 @@ export class Player {
     if (yaw !== undefined) this.yaw = yaw;
     if (pitch !== undefined) this.pitch = pitch;
     this.syncCamera();
+  }
+
+  /** M2 extension: adds dynamic obstacles on top of the era's static colliders. */
+  setExtraObstacleFilter(
+    filter: ((collider: RAPIER.Collider, era: EraId) => boolean) | null,
+  ): void {
+    this.extraObstacleFilter = filter;
   }
 
   snapshot(): PoseSnapshot {
