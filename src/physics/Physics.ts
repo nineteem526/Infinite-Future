@@ -9,6 +9,7 @@ import {
   GRAVITY,
   SAFETY_HALF_HEIGHT,
   SAFETY_RADIUS,
+  PLAYER_TOTAL_HALF_HEIGHT,
 } from '../core/constants';
 import type { Vec3, Vec3Tuple } from '../core/types';
 import type { EraId, SolidSpec } from '../world/types';
@@ -134,6 +135,41 @@ export class Physics {
       (collider) => this.eraByCollider.get(collider.handle) === era,
     );
     return { blocked: hits > 0, hits };
+  }
+
+  /** True when a nearby surface can support a grounded player at this height. */
+  hasSupport(era: EraId, center: Vec3): boolean {
+    const ray = new RAPIER.Ray(
+      { x: center.x, y: center.y - PLAYER_TOTAL_HALF_HEIGHT + 0.12, z: center.z },
+      { x: 0, y: -1, z: 0 },
+    );
+    return this.world.castRay(ray, 0.35, true, undefined, undefined, undefined, undefined, this.filterForEra(era)) !== null;
+  }
+
+  /** Find a nearby clear position without crossing an obstacle in the source era. */
+  findSafeLanding(source: EraId, target: EraId, center: Vec3, grounded: boolean): Vec3 | null {
+    const step = 0.25;
+    for (let radius = step; radius <= 2.0; radius += step) {
+      for (let index = 0; index < 16; index += 1) {
+        const angle = index * Math.PI / 8;
+        const dx = Math.cos(angle) * radius;
+        const dz = Math.sin(angle) * radius;
+        const candidate = { x: center.x + dx, y: center.y, z: center.z + dz };
+        if (this.isCapsuleObstructed(target, candidate).blocked) continue;
+        if (grounded && !this.hasSupport(target, candidate)) continue;
+        let pathClear = true;
+        const samples = Math.ceil(radius / 0.2);
+        for (let i = 1; i <= samples; i += 1) {
+          const t = i / samples;
+          if (this.isCapsuleObstructed(source, { x: center.x + dx * t, y: center.y, z: center.z + dz * t }).blocked) {
+            pathClear = false;
+            break;
+          }
+        }
+        if (pathClear) return candidate;
+      }
+    }
+    return null;
   }
 
   step(dt: number = FIXED_DT): void {

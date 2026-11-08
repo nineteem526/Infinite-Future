@@ -28,8 +28,12 @@ export function installBrowserAcceptance(api: M1TestApi): void {
       api.switchEra();
       await api.step(4);
       const blocked = api.state();
-      check(blocked.era === '2026' && blocked.rejectionCount === before.rejectionCount + 1 && blocked.hud.toast.includes('拒绝'), '目标墙体阻止切换并提示');
+      check(blocked.era === '2126' && blocked.rejectionCount === before.rejectionCount && blocked.hud.toast.includes('避开'), '目标墙体附近自动寻找安全落点');
+      check(Math.hypot(blocked.pose.position.x - before.pose.position.x, blocked.pose.position.z - before.pose.position.z) <= 2.05 && !api.probe('2126', blocked.pose.position.x, blocked.pose.position.y, blocked.pose.position.z).blocked, '新位置安全且距离不超过 2 米');
       api.teleport(0, 0.92, 20);
+      await api.step(4);
+      api.switchEra();
+      await api.step(4);
       await api.step(8);
       api.press('Space'); api.release('Space');
       await api.step(4);

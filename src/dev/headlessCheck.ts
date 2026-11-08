@@ -240,34 +240,20 @@ async function run(): Promise<void> {
   check(stop2126 > 6.4 && stop2126 < 7.4, `2126 rubble wall blocks the lane at z=${stop2126.toFixed(2)}`);
   check(Math.abs(stop2126 - stop2026) > 1.5, 'collision layout changes together with the active era');
 
-  // --- 7. rejected switch: 2026 -> 2126 into rubble ----------------------
+  // --- 7. obstructed target finds a nearby safe landing -----------------
   player.teleport(0, STANDING_CENTER_Y + 0.02, 20, 0, 0);
   simulate(4);
   check(timeShift.request('2026').ok, 'switch back to 2026 at a safe spawn succeeds');
   simulate(4);
-  const rejectionsBefore = timeShift.rejectionCount;
   player.teleport(0, STANDING_CENTER_Y + 0.02, 6, 0, 0);
   simulate(4);
-  const rejected = timeShift.request('2126');
-  check(!rejected.ok, 'switch into a 2126 rubble wall is rejected');
-  check(worldState.currentEra === '2026', 'rejected switch keeps the active era unchanged');
-  check(era2026.group.visible && !era2126.group.visible, 'rejected switch keeps render state unchanged');
-  check(scene.background instanceof THREE.Color && scene.background.getHex() === era2026.lighting.background,
-    'rejected switch keeps environment state unchanged');
-  check(timeShift.rejectionCount === rejectionsBefore + 1, 'rejection counter increments exactly once');
-  check(hudState.toast.includes('被拒绝'), 'rejection produces a HUD message');
-  check(hudState.era === '2026', 'rejection keeps the HUD era badge unchanged');
-
-  // --- 8. rejected switch: 2126 -> 2026 into the monument ----------------
-  player.teleport(0, STANDING_CENTER_Y + 0.02, 20, 0, 0);
-  simulate(4);
-  check(timeShift.request('2126').ok, 'switch to 2126 at a safe spawn succeeds again');
-  simulate(4);
-  player.teleport(0, STANDING_CENTER_Y + 0.02, 0, 0, 0);
-  simulate(4);
-  const reverse = timeShift.request('2026');
-  check(!reverse.ok, 'switch into the 2026 monument is rejected from open 2126 ground');
-  check(worldState.currentEra === '2126', 'reverse rejection keeps 2126 active');
+  const beforeAdjusted = player.snapshot();
+  const adjusted = timeShift.request('2126');
+  check(adjusted.ok && adjusted.adjusted === true, 'obstructed target finds a nearby landing');
+  check(!physics.isCapsuleObstructed('2126', player.position).blocked, 'adjusted landing is clear in target era');
+  check(vectorsEqual(beforeAdjusted.velocity, player.snapshot().velocity), 'adjusted landing preserves velocity');
+  check(hudState.toast.includes('避开'), 'adjustment provides a gentle hint');
+  check(worldState.currentEra === '2126' && era2126.group.visible && !era2026.group.visible, 'adjustment commits target state and visuals');
 
   // --- 9. successful switch preserves position / view / velocity ---------
   player.teleport(0, STANDING_CENTER_Y + 0.02, 20, 0.7, -0.2);

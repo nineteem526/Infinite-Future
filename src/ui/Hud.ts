@@ -66,7 +66,7 @@ export class Hud implements HudPort {
           <li><span class="key">空格</span><span>跳跃</span></li>
           <li><span class="key">E</span><span>切换时代（保持位置、视角、速度）</span></li>
         </ul>
-        <p class="overlay-note">两个时代已预加载，切换不加载资源、不刷新页面。目标位置被障碍占据时切换会被拒绝。</p>
+        <p class="overlay-note">两个时代已预加载，切换不加载资源、不刷新页面。目标位置被障碍占据时会尝试移至附近安全位置。</p>
         <button type="button" class="enter-button">点击进入测试场</button>
       </div>
     `;
