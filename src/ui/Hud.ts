@@ -6,6 +6,11 @@ interface HudCallbacks {
   onEnter: () => void;
 }
 
+/** Shared objective label so tests and HUD render the exact same completion text. */
+export function objectiveEyebrowLabel(objective: ObjectiveView): string {
+  return objective.done ? '主线完成' : `目标 ${objective.step} / ${objective.total}`;
+}
+
 /**
  * DOM HUD: start overlay, crosshair, era badge, control hint, switch toast and
  * a small status line. Written entirely in Chinese to match the project brief.
@@ -23,6 +28,7 @@ export class Hud implements HudPort {
   private readonly objectiveStatus: HTMLDivElement;
   private readonly held: HTMLDivElement;
   private readonly interactionPrompt: HTMLDivElement;
+  private readonly storySubtitle: HTMLDivElement;
   private readonly hint: HTMLDivElement;
   private readonly toast: HTMLDivElement;
   private readonly stats: HTMLDivElement;
@@ -67,6 +73,10 @@ export class Hud implements HudPort {
     this.interactionPrompt = document.createElement('div');
     this.interactionPrompt.className = 'interact-prompt';
 
+    this.storySubtitle = document.createElement('div');
+    this.storySubtitle.className = 'story-subtitle';
+    this.storySubtitle.setAttribute('role', 'note');
+
     this.hint = document.createElement('div');
     this.hint.className = 'hint';
 
@@ -82,19 +92,19 @@ export class Hud implements HudPort {
     this.overlay.className = 'overlay';
     this.overlay.innerHTML = `
       <div class="overlay-card">
-        <p class="overlay-eyebrow">INFINITE FUTURE · M2 因果原型</p>
-        <h1 class="overlay-title">双时代因果测试场</h1>
-        <p class="overlay-subtitle">2026 暖金广场 &nbsp;/&nbsp; 2126 铅灰废墟</p>
+        <p class="overlay-eyebrow">INFINITE FUTURE · M3 主线原型</p>
+        <h1 class="overlay-title">最后的画廊</h1>
+        <p class="overlay-subtitle">双时代主线闭环 · 占位几何原型</p>
         <ul class="overlay-controls">
-          <li><span class="key">W A S D</span><span>移动</span></li>
+          <li><span class="key">W A S D</span><span>移动 / 空格跳跃</span></li>
           <li><span class="key">鼠标</span><span>观察（点击后锁定）</span></li>
-          <li><span class="key">空格</span><span>跳跃</span></li>
           <li><span class="key">E</span><span>切换时代（保持位置、视角、速度）</span></li>
-          <li><span class="key">F</span><span>拾取 / 放入 / 操作机关</span></li>
-          <li><span class="key">R</span><span>重置因果链</span></li>
+          <li><span class="key">F</span><span>观察 / 拾取 / 放入 / 操作机关</span></li>
+          <li><span class="key">R</span><span>重新开始主线</span></li>
+          <li><span class="key">Esc</span><span>释放鼠标</span></li>
         </ul>
-        <p class="overlay-note">两个时代已预加载；目标位置被障碍占据时会尝试移至附近安全位置。能源晶体只能携带一件。</p>
-        <button type="button" class="enter-button">点击进入测试场</button>
+        <p class="overlay-note">两个时代已预加载，切换不加载资源、不刷新页面。目标位置被障碍占据时会尝试移到附近安全位置；能源晶体是唯一物品，重开回到画廊起点。</p>
+        <button type="button" class="enter-button">点击进入画廊</button>
       </div>
     `;
 
@@ -109,6 +119,7 @@ export class Hud implements HudPort {
       this.objectivePanel,
       this.hint,
       this.interactionPrompt,
+      this.storySubtitle,
       this.held,
       this.toast,
       this.stats,
@@ -133,12 +144,10 @@ export class Hud implements HudPort {
       : '点击画面锁定鼠标 · WASD 移动 · 空格 跳跃 · E 切换 · F 交互 · R 重置';
   }
 
-  /** Renders the data-driven M2 objective; called only when text changes. */
+  /** Renders the data-driven M2/M3 objective; called only when text changes. */
   setObjective(objective: ObjectiveView, status: string): void {
     this.objectivePanel.classList.toggle('done', objective.done);
-    this.objectiveEyebrow.textContent = objective.done
-      ? '因果链完成'
-      : `目标 ${objective.step} / ${objective.total}`;
+    this.objectiveEyebrow.textContent = objectiveEyebrowLabel(objective);
     this.objectiveTitle.textContent = objective.title;
     this.objectiveStatus.textContent = status;
   }
@@ -155,6 +164,17 @@ export class Hud implements HudPort {
     }
     this.interactionPrompt.textContent = text;
     this.interactionPrompt.classList.add('visible');
+  }
+
+  /** Narrative subtitles are presentation only; WorldState owns story progress. */
+  setStorySubtitle(text: string | null): void {
+    if (text === null || text.length === 0) {
+      this.storySubtitle.textContent = '';
+      this.storySubtitle.classList.remove('visible');
+      return;
+    }
+    this.storySubtitle.textContent = text;
+    this.storySubtitle.classList.add('visible');
   }
 
   setStats(fps: number): void {

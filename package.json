@@ -2,7 +2,7 @@
   "name": "infinite-future",
   "version": "1.0.0",
   "private": true,
-  "description": "Infinite Future — first-person time-shift prototype (M1-001)",
+  "description": "Infinite Future — first-person dual-era mainline prototype",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "test:m1": "node src/dev/runCheck.mjs src/dev/headlessCheck.ts",
-    "test:causality": "node src/dev/runCheck.mjs src/dev/causalityCheck.ts"
+    "test:causality": "node src/dev/runCheck.mjs src/dev/causalityCheck.ts",
+    "test:story": "node src/dev/runCheck.mjs src/dev/storyCheck.ts"
   },
   "keywords": [],
   "author": "",

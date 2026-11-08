@@ -2,7 +2,6 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import {
   DEFAULT_PITCH,
-  DEFAULT_SPAWN,
   DEFAULT_YAW,
   FIXED_DT,
   MAX_FRAME_TIME,
@@ -13,6 +12,9 @@ import { Ambience } from '../audio/Ambience';
 import { Input } from '../input/Input';
 import { CausalitySystem } from '../m2/CausalitySystem';
 import { createM2Content, type M2Content } from '../m2/content';
+import { createStoryContent, type StoryContent } from '../m3/content';
+import { STORY_SPAWN } from '../m3/layout';
+import { StorySystem } from '../m3/StorySystem';
 import { Player, type PlayerSpawn } from '../player/Player';
 import { Physics } from '../physics/Physics';
 import { TimeShift } from '../time/TimeShift';
@@ -48,9 +50,11 @@ export class Game {
   readonly timeShift: TimeShift;
   readonly m2Content: M2Content;
   readonly causality: CausalitySystem;
+  readonly storyContent: StoryContent;
+  readonly story: StorySystem;
 
   private readonly spawn: PlayerSpawn = {
-    position: { ...DEFAULT_SPAWN },
+    position: { ...STORY_SPAWN.position },
     yaw: DEFAULT_YAW,
     pitch: DEFAULT_PITCH,
   };
@@ -156,6 +160,20 @@ export class Game {
       this.m2Content.gateCollider, '2126', () => this.causality.gateObstacleActive(), true,
     );
 
+    // M3 mainline: gallery, story-gated barriers, subtitles and stage machine.
+    this.storyContent = createStoryContent({
+      eras: this.eras,
+      physics: this.physics,
+    });
+    this.story = new StorySystem({
+      worldState: this.worldState,
+      player: this.player,
+      physics: this.physics,
+      hud: this.hud,
+      content: this.storyContent,
+      causality: this.causality,
+    });
+
     window.addEventListener('resize', this.handleResize);
     this.handleResize();
 
@@ -245,10 +263,10 @@ export class Game {
   };
 
   private fixedUpdate(dt: number): void {
-    // Deterministic order: reset, then era transactions, then interactions, then
-    // movement. Reset teleports to spawn before requesting the initial era.
+    // Deterministic order: reset, era transactions, story interactions (which
+    // take priority over M2 targets), then movement. R starts the mainline over.
     while (this.input.consumeReset()) {
-      this.causality.resetRun();
+      this.story.resetRun();
     }
 
     // Queued E presses are drained in order; each request is a full transaction.
@@ -257,13 +275,19 @@ export class Game {
     }
 
     while (this.input.consumeInteract()) {
-      this.causality.interact();
+      if (!this.story.interact()) {
+        this.causality.interact();
+      }
     }
 
     this.player.update(dt, this.input, this.worldState.currentEra);
     this.physics.step(dt);
     this.player.afterPhysicsStep();
+
+    // M2 presentation runs first; M3 then owns the final objective/status/prompt
+    // so the mainline guidance always wins on the HUD.
     this.causality.tick();
+    this.story.tick();
 
     if (this.player.position.y < VOID_Y) {
       this.player.teleport(
@@ -273,7 +297,7 @@ export class Game {
         this.spawn.yaw,
         this.spawn.pitch,
       );
-      this.hud.showToast('已离开测试场边界，返回出生点', 'info');
+      this.hud.showToast('已离开可站立区域，返回画廊出生点', 'info');
     }
   }
 }

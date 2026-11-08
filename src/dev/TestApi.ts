@@ -10,6 +10,9 @@ import {
   type InteractionTarget,
   type ObjectiveView,
 } from '../m2/types';
+import { FRAME_DESTINATION, FRAME_DESTINATION_LABEL, STORY_TARGETS } from '../m3/layout';
+import type { StoryPresentationSnapshot } from '../m3/StorySystem';
+import type { StoryOutcome, StoryState, StoryTarget } from '../m3/types';
 import { type EraId } from '../world/types';
 
 export interface M1TestState {
@@ -40,6 +43,7 @@ export interface M1TestState {
     toast: string;
     overlayVisible: boolean;
     objective: string;
+    objectiveEyebrow: string;
     held: string;
     interactionPrompt: string;
   };
@@ -78,6 +82,19 @@ export interface M2TestState extends M1TestState {
   };
 }
 
+export interface M3TestState extends M2TestState {
+  story: StoryState;
+  storyObjective: ObjectiveView;
+  storyStatus: string;
+  storySubtitle: string;
+  storyPresentation: StoryPresentationSnapshot;
+  storyTargets: readonly StoryTarget[];
+  storyOutcome: StoryOutcome | null;
+  frameDestination: { readonly x: number; readonly y: number; readonly z: number };
+  frameDestinationSafe: boolean;
+  facingBlankCanvas: boolean;
+}
+
 export interface ObstructionProbe {
   blocked: boolean;
   hits: number;
@@ -102,11 +119,27 @@ export interface M2TestApi extends M1TestApi {
   interactionPrompt(): string | null;
 }
 
+export interface M3TestApi extends M2TestApi {
+  state(): M3TestState;
+  storyInteract(): StoryOutcome | null;
+  storyObjective(): ObjectiveView;
+  storySubtitleText(): string;
+  storyStatus(): string;
+  storyPresentation(): StoryPresentationSnapshot;
+  frameTeleportInfo(): {
+    destination: { readonly x: number; readonly y: number; readonly z: number };
+    label: string;
+    safe: boolean;
+  };
+  blankCanvasFacing(): boolean;
+}
+
 declare global {
   interface Window {
     __M1_READY__?: boolean;
     __M1_TEST__?: M1TestApi;
     __M2_TEST__?: M2TestApi;
+    __M3_TEST__?: M3TestApi;
   }
 }
 
@@ -137,14 +170,15 @@ export function installTestApi(game: Game, errors: string[]): void {
     );
   };
 
-  const api: M2TestApi = {
-    state(): M2TestState {
+  const api: M3TestApi = {
+    state(): M3TestState {
       const era = game.worldState.currentEra;
       const eraObj = game.eras.get(era);
       const fog = game.scene.fog;
       const badge = document.querySelector('.era-badge-title')?.textContent ?? '';
       const hint = document.querySelector('.hint')?.textContent ?? '';
       const objectiveTitle = document.querySelector('.objective-title')?.textContent ?? '';
+      const objectiveEyebrow = document.querySelector('.objective-eyebrow')?.textContent ?? '';
       const objectiveStatusText = document.querySelector('.objective-status')?.textContent ?? '';
       const heldText = document.querySelector('.held')?.textContent ?? '';
       const promptText = document.querySelector('.interact-prompt')?.textContent ?? '';
@@ -174,6 +208,7 @@ export function installTestApi(game: Game, errors: string[]): void {
           toast: game.hud.currentToastText(),
           overlayVisible: game.hud.isOverlayVisible,
           objective: objectiveTitle,
+          objectiveEyebrow,
           held: heldText,
           interactionPrompt: promptText,
         },
@@ -187,7 +222,7 @@ export function installTestApi(game: Game, errors: string[]): void {
         causality,
         heldItemId: causality.crystal.kind === 'inventory' ? CRYSTAL_ITEM_ID : null,
         crystalItemId: CRYSTAL_ITEM_ID,
-        objective: game.causality.objective(),
+        objective: game.story.objectiveView(),
         objectiveStatus: objectiveStatusText,
         interactionPromptText: promptText.length > 0 ? promptText : null,
         presentation: game.causality.presentation(),
@@ -206,6 +241,16 @@ export function installTestApi(game: Game, errors: string[]): void {
           static2126: game.m2Content.staticSolids2126,
           gateHandle: game.m2Content.gateColliderHandle,
         },
+        story: game.worldState.story,
+        storyObjective: game.story.objectiveView(),
+        storyStatus: game.story.statusLine(),
+        storySubtitle: game.story.subtitle(),
+        storyPresentation: game.story.presentation(),
+        storyTargets: STORY_TARGETS,
+        storyOutcome: game.story.lastOutcome,
+        frameDestination: FRAME_DESTINATION,
+        frameDestinationSafe: game.story.frameDestinationSafe(),
+        facingBlankCanvas: game.story.facesBlankCanvas(),
       };
     },
 
@@ -225,14 +270,52 @@ export function installTestApi(game: Game, errors: string[]): void {
     },
 
     interact(): InteractionOutcome | null {
-      // Direct path through the same CausalitySystem used by the game loop.
-      // For synthetic input-path checks use press('KeyF') + step().
+      // Mirrors the in-game F routing: story targets first, then M2 targets.
+      // The story outcome is available via state().storyOutcome/storyInteract().
+      if (game.story.interact()) return null;
       return game.causality.interact();
     },
 
     resetRun(): void {
       // Direct reset; press('KeyR') exercises the queued input path instead.
-      game.causality.resetRun();
+      game.story.resetRun();
+    },
+
+    storyInteract(): StoryOutcome | null {
+      const handled = game.story.interact();
+      return handled ? game.story.lastOutcome : null;
+    },
+
+    storyObjective(): ObjectiveView {
+      return game.story.objectiveView();
+    },
+
+    storySubtitleText(): string {
+      return game.story.subtitle();
+    },
+
+    storyStatus(): string {
+      return game.story.statusLine();
+    },
+
+    storyPresentation(): StoryPresentationSnapshot {
+      return game.story.presentation();
+    },
+
+    frameTeleportInfo(): {
+      destination: { readonly x: number; readonly y: number; readonly z: number };
+      label: string;
+      safe: boolean;
+    } {
+      return {
+        destination: game.story.frameDestination(),
+        label: FRAME_DESTINATION_LABEL,
+        safe: game.story.frameDestinationSafe(),
+      };
+    },
+
+    blankCanvasFacing(): boolean {
+      return game.story.facesBlankCanvas();
     },
 
     teleport(x: number, y: number, z: number, yaw?: number, pitch?: number): void {
@@ -261,14 +344,15 @@ export function installTestApi(game: Game, errors: string[]): void {
     },
 
     objective(): ObjectiveView {
-      return game.causality.objective();
+      return game.story.objectiveView();
     },
 
     interactionPrompt(): string | null {
-      return game.causality.promptForCurrentPosition();
+      return game.story.effectivePrompt();
     },
   };
 
+  window.__M3_TEST__ = api;
   window.__M2_TEST__ = api;
   window.__M1_TEST__ = api;
 }

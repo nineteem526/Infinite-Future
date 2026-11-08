@@ -20,7 +20,7 @@ function showFatal(container: HTMLElement, error: unknown): void {
   const fatal = document.createElement('div');
   fatal.className = 'fatal';
   fatal.textContent = [
-    'Infinite Future — M1 原型启动失败',
+    'Infinite Future — 主线启动失败',
     '',
     message,
     '',
@@ -52,5 +52,5 @@ main().catch((error: unknown) => {
   if (container) showFatal(container, error);
   // Keep the failure observable for manual acceptance tooling.
   window.__M1_READY__ = false;
-  console.error('[M1] 启动失败', error);
+  console.error('[Infinite Future] 启动失败', error);
 });
