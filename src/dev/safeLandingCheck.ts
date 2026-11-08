@@ -28,6 +28,22 @@ const result = shift.request('2126');
 if (!result.ok || !result.adjusted || physics.isCapsuleObstructed('2126',player.position).blocked) throw new Error('safe landing failed');
 if (player.velocity.x !== 1 || player.velocity.y !== 2 || player.velocity.z !== -3 || player.yaw !== 0.4 || player.pitch !== 0.2) throw new Error('motion or view changed');
 console.log('PASS: blocked target resolves safely while preserving motion and view');
+// A critical dynamic barrier participates in the target-era query and blocks
+// automatic displacement; after opening it no longer obstructs movement or shifting.
+let gateClosed = true;
+const gate = physics.world.createCollider(RAPIER.ColliderDesc.cuboid(0.15, 2, 1).setTranslation(50, 1, 0));
+physics.registerDynamicCollider(gate, '2026', () => gateClosed, true);
+physics.step();
+player.teleport(50, 1, 0); player.grounded = false;
+const protectedBefore = player.snapshot();
+const protectedResult = shift.request('2026');
+if (protectedResult.ok || !physics.isCapsuleObstructed('2026', player.position).protectedObstacle || JSON.stringify(protectedBefore) !== JSON.stringify(player.snapshot())) throw new Error('closed gate was bypassed');
+gateClosed = false;
+if (physics.isCapsuleObstructed('2026', player.position).blocked) throw new Error('open gate still obstructs');
+if (!shift.request('2026').ok) throw new Error('open gate did not allow switch');
+player.teleport(0, 0.92, 20); physics.step();
+if (!shift.request('2126').ok) throw new Error('return to 2126 failed');
+console.log('PASS: critical dynamic barrier blocks relocation when closed and permits switch when open');
 // At an enclosed target no candidate within search radius is valid.
 physics.addSolids('2026', [{kind:'box', halfExtents:[5,3,5], position:[100,1,0], color:0}]);
 physics.step();

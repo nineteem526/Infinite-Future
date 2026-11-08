@@ -83,7 +83,9 @@ export class TimeShift {
 
     let adjusted = false;
     if (report.blocked) {
-      const landing = this.physics.findSafeLanding(from, target, pose.position, pose.grounded);
+      const landing = report.protectedObstacle
+        ? null
+        : this.physics.findSafeLanding(from, target, pose.position, pose.grounded);
       if (!landing) {
         const reason = '附近没有安全落点，请稍微移动后再试';
         this.rejectionCount += 1;
