@@ -9,7 +9,7 @@ import type {
 export const STORY_OBJECTIVE_TOTAL = 6;
 
 export const STORY_INTRO_SUBTITLE =
-  '最后的画廊。左边是过去，右边是未来，中央是一块空白画布。';
+  '最后的画廊。左边是未来，右边是过去，中央是一块空白画布。';
 
 export const STORY_STREET_SUBTITLE =
   '街道还活着。沿着它走向城市核心——时间工坊在那里等着能源。';
@@ -310,3 +310,4 @@ export function storyStatusView(stage: StoryState['stage']): string {
       return '主线完成';
   }
 }
+

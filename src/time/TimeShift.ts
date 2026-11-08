@@ -6,6 +6,7 @@ import type { EraId } from '../world/types';
 import type { WorldState } from '../world/WorldState';
 
 export interface HudPort {
+  playTeleportEffect?(era: EraId): void;
   setEra(era: EraId, name: string, description: string): void;
   showToast(message: string, kind: 'error' | 'info'): void;
   setSwitchStats(switches: number, rejections: number): void;
@@ -103,6 +104,7 @@ export class TimeShift {
     }
 
     this.apply(target);
+    this.hud.playTeleportEffect?.(target);
     this.switchCount += 1;
     this.hud.setSwitchStats(this.switchCount, this.rejectionCount);
     if (adjusted) this.hud.showToast('已避开时空障碍', 'info');
@@ -128,3 +130,4 @@ export class TimeShift {
     this.hud.setEra(target, targetEra.name, targetEra.description);
   }
 }
+

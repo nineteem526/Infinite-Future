@@ -59,3 +59,12 @@ npm run build、test:m1、test:causality、test:story 实际运行通过（主�
 M4-003 实测：build 通过；浏览器过去背景与未来背景均正常显示，折时仪解锁后 E 切换至 2126，API errors=[]。截图为定位测试，不代表全流程或 1080p 帧率验收。原始素材未修改。
 
 M4-004：build 实际通过。独立浏览器截图 panorama-past.png、panorama-seam.png 检查过去正反方向；实际解锁折时仪并切换至2126，API errors=[]，截图 panorama-future.png。有限视角验证不代表全周接缝、极点变形和所有设备性能通过。
+
+M4-005：外围房屋与植被纯视觉生成已删除，两时代共用该变更；无接口和碰撞变更。npm run build 通过；浏览器南向截图验证房屋和树木移除、全景露出，API errors=[]。未重复完整主线验收。
+
+M4-006 实测：build、test:causality(112项)通过；浏览器过去/未来钟楼、发电机和柱廊正常渲染，API errors=[]；本地截图 tower-past.png、tower-future.png、generator-detail.png。test:story 在画廊中央画布开口尺寸断言失败（当前 openingMargin=-0.1）；不是本轮修改，未调整现有画框以避免覆盖其他工作。完整流程与1080p性能未验收。
+
+M5-001实测：同窗口同姿态比较绘制452→184，画布像素1236×1197→824×798；未来切换后API errors=[]。build、test:causality112项通过。未以该测试声称稳定60FPS，主线画框尺寸已知失败仍保留记录。
+
+M5-002：build、M1、因果112项实际通过。浏览器画框传送后触发动画，E切入2126后可见“时空跃迁·2126”与光环效果，两动画正常创建、API errors=[]；检查晶台及拉杆显示，截图teleport-crystal.png、lever-detail.png。未重新宣称已知画框尺寸断言通过。
+M5-002补充实测：关闭闸门目标处请求切换被拒绝，时代保持2026，成功动画数量为0，API errors=[]。

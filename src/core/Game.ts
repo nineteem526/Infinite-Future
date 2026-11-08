@@ -25,6 +25,7 @@ import { TimeShift } from '../time/TimeShift';
 import { Hud } from '../ui/Hud';
 import { Era } from '../world/Era';
 import { dressWorld } from '../world/artDirection';
+import { optimizeStaticDetails } from '../world/optimizeStaticDetails';
 import { preloadCityBackdrops, addCityBackdrops, type CityBackdrops } from '../world/cityBackdrop';
 import { createEra2026 } from '../world/eras/era2026';
 import { createEra2126 } from '../world/eras/era2126';
@@ -97,7 +98,7 @@ export class Game {
       antialias: true,
       powerPreference: 'high-performance',
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -202,6 +203,7 @@ export class Game {
       console.info('[ART-002-art]', line);
     }
     dressWorld(this.eras);
+    for (const era of this.eras.values()) optimizeStaticDetails(era.group);
     addCityBackdrops(this.eras, cityBackdrops);
     this.story = new StorySystem({
       worldState: this.worldState,
@@ -349,5 +351,6 @@ export class Game {
     }
   }
 }
+
 
 

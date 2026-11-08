@@ -20,3 +20,9 @@ M4-002：dressExterior 作为 dressWorld 的内部视觉模块调用；结构石
 M4-003：双时代背景图经 Game.create 的 Promise.all 预加载，传入 addCityBackdrops，网格随 era.group 原子显隐。两图共享投影，切换不触发加载；无碰撞变更。原图不是全景，因此只覆盖北向约 109°，不镜像复制地标。
 
 M4-004 更新：背景从定向弧面改为半径 240 的内向球面，onBeforeRender 跟随相机，renderOrder=-20，关闭深度写入及雾、色调映射。保留时代组所有权，预加载完成后不因切换发起请求。原图独立保存，UV 垂直校准适配两图地平线差异。
+
+M4-006：refineClockTower/refinePlazaProps 在 exteriorArt 内按时代启动构建，新增专属子组；所有新增细节仅视觉、无碰撞。钟面文字为本地 CanvasTexture，固定内容无在线请求，缺失 document 时不创建文字。实例化重复构件；运行时无动态生成。旧钟楼非结构装饰按局部范围隐藏，结构 solid-box 保留。
+
+M5-001：静态合批仅启动时执行于自有装饰组。按材质合并并转换到组内坐标，不处理交互物件、导入素材、透明件或已有实例化几何。全部小装饰关闭投影，结构阴影保留；渲染倍率上限1。双时代分别预建后仍随原组同步切换。
+
+M5-002：HudPort/StoryHudPort新增可选 playTeleportEffect(era)，生产HUD实现，逻辑测试替身可省略。TimeShift仅在成功apply后触发；画框传送单独触发。动画不参与物理及状态事务。装饰继续在启动合批并关闭投影。

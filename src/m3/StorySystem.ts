@@ -1,3 +1,4 @@
+import type { EraId } from '../world/types';
 import { EYE_HEIGHT, PLAYER_TOTAL_HALF_HEIGHT } from '../core/constants';
 import type { CausalitySystem } from '../m2/CausalitySystem';
 import type { ObjectiveView } from '../m2/types';
@@ -21,6 +22,7 @@ import type { StoryAction, StoryOutcome, StoryState, StoryTarget } from './types
 const BLANK_CANVAS_FACING_DOT = 0.55;
 
 export interface StoryHudPort {
+  playTeleportEffect?(era: EraId): void;
   showToast(message: string, kind: 'error' | 'info'): void;
   setObjective(objective: ObjectiveView, status: string): void;
   setInteractionPrompt(text: string | null): void;
@@ -275,6 +277,7 @@ export class StorySystem {
   }
 
   private teleportThroughFrame(): void {
+    this.hud.playTeleportEffect?.(this.worldState.currentEra);
     this.player.teleport(
       FRAME_DESTINATION.x,
       FRAME_DESTINATION.y,
@@ -375,3 +378,5 @@ export class StorySystem {
     }
   }
 }
+
+

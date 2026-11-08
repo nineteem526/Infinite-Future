@@ -466,3 +466,7 @@ body {
     bottom: 14px;
   }
 }
+
+.teleport-effect { position: fixed; inset: 0; z-index: 80; pointer-events: none; opacity: 0; overflow: hidden; background: radial-gradient(ellipse at center, rgba(var(--warp-color),.02) 20%, rgba(var(--warp-color),.32) 100%); }
+.teleport-ring { position: absolute; left: 50%; top: 50%; width: 75vmax; height: 75vmax; border-radius: 50%; border: 3px solid rgba(var(--warp-color),.85); box-shadow: 0 0 36px rgba(var(--warp-color),.5), inset 0 0 30px rgba(var(--warp-color),.25); transform: translate(-50%,-50%); }
+.teleport-effect > span { position: absolute; top: 28%; left: 0; width: 100%; text-align: center; color: rgb(var(--warp-color)); font-size: 18px; letter-spacing: .35em; text-shadow: 0 2px 8px #000; }

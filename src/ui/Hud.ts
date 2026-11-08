@@ -138,6 +138,26 @@ export class Hud implements HudPort {
     this.badgeSubtitle.textContent = description;
   }
 
+  playTeleportEffect(era: EraId): void {
+    let effect = this.root.querySelector<HTMLDivElement>('.teleport-effect');
+    if (!effect) {
+      effect = document.createElement('div');
+      effect.className = 'teleport-effect';
+      effect.setAttribute('aria-hidden', 'true');
+      effect.innerHTML = '<div class="teleport-ring"></div><span></span>';
+      this.root.append(effect);
+    }
+    effect.style.setProperty('--warp-color', era === '2026' ? '246, 200, 124' : '132, 221, 239');
+    effect.querySelector('span')!.textContent = `时空跃迁 · ${era}`;
+    // Cancel/restart instead of stacking effects when E is pressed rapidly.
+    for (const node of [effect, ...effect.children]) for (const animation of node.getAnimations()) animation.cancel();
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    effect.animate([{opacity:0},{opacity:1,offset:0.12},{opacity:0}], {duration:reduced?220:650,easing:'ease-out'});
+    if (!reduced) effect.querySelector('.teleport-ring')!.animate([
+      {transform:'translate(-50%, -50%) scale(0.12)',opacity:0.9},
+      {transform:'translate(-50%, -50%) scale(2.8)',opacity:0}
+    ], {duration:650,easing:'cubic-bezier(.16,.7,.25,1)'});
+  }
   setPointerLocked(locked: boolean): void {
     this.hint.textContent = locked
       ? 'WASD 移动 · 鼠标 观察 · 空格 跳跃 · E 切换 · F 交互 · R 重置 · Esc 释放鼠标'
@@ -222,3 +242,4 @@ export class Hud implements HudPort {
     this.stats.textContent = `${fpsPart} · 切换 ${this.switches} · 已拒绝 ${this.rejections}`;
   }
 }
+
