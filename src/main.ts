@@ -1,6 +1,7 @@
 import './style.css';
 import { Game } from './core/Game';
 import { installTestApi } from './dev/TestApi';
+import { installBrowserAcceptance } from './dev/browserAcceptance';
 
 const errors: string[] = [];
 
@@ -35,6 +36,9 @@ async function main(): Promise<void> {
   game.start();
 
   installTestApi(game, errors);
+  if (new URLSearchParams(window.location.search).has('acceptance') && window.__M1_TEST__) {
+    installBrowserAcceptance(window.__M1_TEST__);
+  }
   window.__M1_READY__ = true;
 }
 
