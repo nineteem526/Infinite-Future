@@ -21,6 +21,7 @@ export interface SwitchOutcome {
   from: EraId;
   to: EraId;
   reason?: string;
+  adjusted?: boolean;
 }
 
 /**
@@ -29,11 +30,11 @@ export interface SwitchOutcome {
  * Invariants enforced here:
  *  - The target position (the player's current capsule) is probed against the
  *    target era's structural colliders before anything changes.
- *  - On rejection nothing changes at all (no visual, collision, light or audio
+ *  - If blocked, a nearby safe landing is selected; if none exists, nothing changes (no visual, collision, light or audio
  *    state is committed).
  *  - On success render visibility, collision ownership, scene environment
  *    (background/fog/exposure) and ambience switch in the same synchronous
- *    transaction. Player position, view and velocity are never modified.
+ *    transaction. View and velocity are preserved; position changes only when necessary.
  */
 export class TimeShift {
   switchCount = 0;
@@ -80,20 +81,32 @@ export class TimeShift {
     const pose = this.player.snapshot();
     const report = this.physics.isCapsuleObstructed(target, pose.position);
 
+    let adjusted = false;
     if (report.blocked) {
-      const targetEra = this.eras.get(target);
-      const reason = `${targetEra?.name ?? target} 中当前位置被障碍占据`;
-      this.rejectionCount += 1;
-      this.lastRejectionReason = reason;
-      this.hud.showToast(`时空切换被拒绝：${reason}`, 'error');
-      this.hud.setSwitchStats(this.switchCount, this.rejectionCount);
-      return { ok: false, from, to: target, reason };
+      const landing = report.protectedObstacle
+        ? null
+        : this.physics.findSafeLanding(from, target, pose.position, pose.grounded);
+      if (!landing) {
+        const reason = '附近没有安全落点，请稍微移动后再试';
+        this.rejectionCount += 1;
+        this.lastRejectionReason = reason;
+        this.hud.showToast(reason, 'info');
+        this.hud.setSwitchStats(this.switchCount, this.rejectionCount);
+        return { ok: false, from, to: target, reason };
+      }
+      // Reposition without Player.teleport(), which deliberately clears velocity.
+      this.player.body.setTranslation(landing, true);
+      this.player.body.setNextKinematicTranslation(landing);
+      this.player.position.set(landing.x, landing.y, landing.z);
+      this.player.syncCamera();
+      adjusted = true;
     }
 
     this.apply(target);
     this.switchCount += 1;
     this.hud.setSwitchStats(this.switchCount, this.rejectionCount);
-    return { ok: true, from, to: target };
+    if (adjusted) this.hud.showToast('已避开时空障碍', 'info');
+    return { ok: true, from, to: target, adjusted };
   }
 
   private apply(target: EraId): void {

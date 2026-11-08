@@ -9,6 +9,7 @@ import {
   GRAVITY,
   SAFETY_HALF_HEIGHT,
   SAFETY_RADIUS,
+  PLAYER_TOTAL_HALF_HEIGHT,
 } from '../core/constants';
 import type { Vec3, Vec3Tuple } from '../core/types';
 import type { EraId, SolidSpec } from '../world/types';
@@ -18,8 +19,10 @@ const MIN_SLOPE_SLIDE_ANGLE = (35 * Math.PI) / 180;
 
 export interface ObstructionReport {
   blocked: boolean;
-  /** Number of target-era colliders overlapping the safety probe (capped at 8). */
+  /** Number of active target-era colliders overlapping the safety probe. */
   hits: number;
+  /** Critical puzzle barriers must not be bypassed by automatic adjustment. */
+  protectedObstacle: boolean;
 }
 
 function rotationFromEuler(rotation: Vec3Tuple): RAPIER.Rotation {
@@ -58,6 +61,8 @@ export class Physics {
 
   private readonly eraByCollider = new Map<number, EraId>();
   private readonly collidersByEra = new Map<EraId, Set<number>>();
+  private readonly dynamicActive = new Map<number, () => boolean>();
+  private readonly protectedObstacles = new Set<number>();
   private readonly safetyShape: RAPIER.Capsule;
 
   constructor() {
@@ -102,13 +107,23 @@ export class Physics {
     }
   }
 
+  /** Register a preloaded dynamic obstacle for movement and time-shift queries. */
+  registerDynamicCollider(collider: RAPIER.Collider, era: EraId, isActive: () => boolean, protectsPuzzle = false): void {
+    if (this.eraByCollider.has(collider.handle)) throw new Error('Collider already registered');
+    this.eraByCollider.set(collider.handle, era);
+    this.collidersByEra.get(era)?.add(collider.handle);
+    this.dynamicActive.set(collider.handle, isActive);
+    if (protectsPuzzle) this.protectedObstacles.add(collider.handle);
+  }
+
   eraOf(handle: number): EraId | undefined {
     return this.eraByCollider.get(handle);
   }
 
   /** Collision filter predicate: only colliders owned by `era` are obstacles. */
   filterForEra(era: EraId): (collider: RAPIER.Collider) => boolean {
-    return (collider) => this.eraByCollider.get(collider.handle) === era;
+    return (collider) => this.eraByCollider.get(collider.handle) === era
+      && (this.dynamicActive.get(collider.handle)?.() ?? true);
   }
 
   /**
@@ -118,22 +133,62 @@ export class Physics {
    */
   isCapsuleObstructed(era: EraId, center: Vec3): ObstructionReport {
     let hits = 0;
+    let protectedObstacle = false;
+    const matchesEra = this.filterForEra(era);
     this.world.intersectionsWithShape(
       center,
       IDENTITY_ROTATION,
       this.safetyShape,
       (collider) => {
-        if (this.eraByCollider.get(collider.handle) !== era) return true;
+        if (!matchesEra(collider)) return true;
         hits += 1;
-        return hits < 8;
+        if (this.protectedObstacles.has(collider.handle)) protectedObstacle = true;
+        return true;
       },
       undefined,
       undefined,
       undefined,
       undefined,
-      (collider) => this.eraByCollider.get(collider.handle) === era,
+      matchesEra,
     );
-    return { blocked: hits > 0, hits };
+    return { blocked: hits > 0, hits, protectedObstacle };
+  }
+
+  /** True when a nearby surface can support a grounded player at this height. */
+  hasSupport(era: EraId, center: Vec3): boolean {
+    const ray = new RAPIER.Ray(
+      { x: center.x, y: center.y - PLAYER_TOTAL_HALF_HEIGHT + 0.12, z: center.z },
+      { x: 0, y: -1, z: 0 },
+    );
+    return this.world.castRay(ray, 0.35, true, undefined, undefined, undefined, undefined, this.filterForEra(era)) !== null;
+  }
+
+  /** Find a nearby clear position without crossing an obstacle in the source era. */
+  findSafeLanding(source: EraId, target: EraId, center: Vec3, grounded: boolean): Vec3 | null {
+    const step = 0.25;
+    for (let radius = step; radius <= 1.0; radius += step) {
+      for (let index = 0; index < 16; index += 1) {
+        const angle = index * Math.PI / 8;
+        const dx = Math.cos(angle) * radius;
+        const dz = Math.sin(angle) * radius;
+        const candidate = { x: center.x + dx, y: center.y, z: center.z + dz };
+        if (this.isCapsuleObstructed(target, candidate).blocked) continue;
+        if (grounded && !this.hasSupport(target, candidate)) continue;
+        let pathClear = true;
+        const samples = Math.ceil(radius / 0.2);
+        for (let i = 1; i <= samples; i += 1) {
+          const t = i / samples;
+          const sample = { x: center.x + dx * t, y: center.y, z: center.z + dz * t };
+          if (this.isCapsuleObstructed(source, sample).blocked
+            || this.isCapsuleObstructed(target, sample).protectedObstacle) {
+            pathClear = false;
+            break;
+          }
+        }
+        if (pathClear) return candidate;
+      }
+    }
+    return null;
   }
 
   step(dt: number = FIXED_DT): void {

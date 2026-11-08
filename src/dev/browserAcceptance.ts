@@ -17,6 +17,10 @@ export function installBrowserAcceptance(api: M1TestApi): void {
       checks.push(`${condition ? 'PASS' : 'FAIL'}: ${name}`);
       if (!condition) throw new Error(name);
     };
+    const waitFor = async (predicate: () => boolean) => {
+      for (let i = 0; i < 120 && !predicate(); i += 1) await api.step(2);
+      if (!predicate()) throw new Error('等待游戏状态超时');
+    };
     try {
       api.teleport(0, 0.92, 20);
       await api.step(8);
@@ -26,18 +30,22 @@ export function installBrowserAcceptance(api: M1TestApi): void {
       await api.step(4);
       const before = api.state();
       api.switchEra();
-      await api.step(4);
+      await waitFor(() => api.state().era !== before.era || api.state().rejectionCount > before.rejectionCount);
       const blocked = api.state();
-      check(blocked.era === '2026' && blocked.rejectionCount === before.rejectionCount + 1 && blocked.hud.toast.includes('拒绝'), '目标墙体阻止切换并提示');
+      check(blocked.era === '2126' && blocked.rejectionCount === before.rejectionCount && blocked.hud.toast.includes('避开'), '目标墙体附近自动寻找安全落点');
+      check(Math.hypot(blocked.pose.position.x - before.pose.position.x, blocked.pose.position.z - before.pose.position.z) <= 1.05 && !api.probe('2126', blocked.pose.position.x, blocked.pose.position.y, blocked.pose.position.z).blocked, '新位置安全且距离不超过 1 米');
       api.teleport(0, 0.92, 20);
+      await api.step(4);
+      api.switchEra();
+      await waitFor(() => api.state().era === '2026');
       await api.step(8);
       api.press('Space'); api.release('Space');
-      await api.step(4);
+      await waitFor(() => api.state().pose.velocity.y > 0);
       const airborne = api.state();
       check(airborne.pose.velocity.y > 0 && !airborne.pose.grounded, '实际跳跃中处于上升阶段');
       const fromY = airborne.pose.position.y;
       api.switchEra();
-      await api.step(2);
+      await waitFor(() => api.state().era === '2126');
       const shifted = api.state();
       check(shifted.era === '2126' && shifted.pose.velocity.y > 0 && shifted.pose.position.y >= fromY, '空中切换后继续上升');
       check(shifted.visibleEra === '2126' && shifted.audio.era === '2126', '画面和音频时代一致');

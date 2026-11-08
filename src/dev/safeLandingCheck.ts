@@ -1,0 +1,65 @@
+import RAPIER from '@dimforge/rapier3d-compat';
+import * as THREE from 'three';
+import { Physics } from '../physics/Physics';
+import { Player } from '../player/Player';
+import { TimeShift, type HudPort, type AudioPort } from '../time/TimeShift';
+import { Era } from '../world/Era';
+import { createEra2026 } from '../world/eras/era2026';
+import { createEra2126 } from '../world/eras/era2126';
+import { WorldState } from '../world/WorldState';
+import type { EraId } from '../world/types';
+
+await RAPIER.init();
+const physics = new Physics();
+const a = new Era(createEra2026(), physics);
+const b = new Era(createEra2126(), physics);
+const eras = new Map<EraId, Era>([['2026', a], ['2126', b]]);
+const scene = new THREE.Scene(); scene.add(a.group, b.group);
+const renderer = { toneMappingExposure: 1 } as THREE.WebGLRenderer;
+const state = new WorldState('2026');
+const player = new Player(physics, {position:{x:0,y:0.92,z:6}, yaw:0.4, pitch:0.2});
+const hud: HudPort = {setEra(){}, showToast(){}, setSwitchStats(){}};
+const audio: AudioPort = {ensureStarted(){},setEra(){}};
+a.setActive(true); a.applyEnvironment(scene,renderer);
+const shift = new TimeShift(state,eras,physics,player,scene,renderer,hud,audio);
+physics.step(); player.afterPhysicsStep(); player.grounded = true;
+player.velocity.set(1, 2, -3);
+const result = shift.request('2126');
+if (!result.ok || !result.adjusted || physics.isCapsuleObstructed('2126',player.position).blocked) throw new Error('safe landing failed');
+if (player.velocity.x !== 1 || player.velocity.y !== 2 || player.velocity.z !== -3 || player.yaw !== 0.4 || player.pitch !== 0.2) throw new Error('motion or view changed');
+console.log('PASS: blocked target resolves safely while preserving motion and view');
+// A critical dynamic barrier participates in the target-era query and blocks
+// automatic displacement; after opening it no longer obstructs movement or shifting.
+let gateClosed = true;
+const gate = physics.world.createCollider(RAPIER.ColliderDesc.cuboid(0.15, 2, 1).setTranslation(50, 1, 0));
+physics.registerDynamicCollider(gate, '2026', () => gateClosed, true);
+physics.step();
+player.teleport(50, 1, 0); player.grounded = false;
+const protectedBefore = player.snapshot();
+const protectedResult = shift.request('2026');
+if (protectedResult.ok || !physics.isCapsuleObstructed('2026', player.position).protectedObstacle || JSON.stringify(protectedBefore) !== JSON.stringify(player.snapshot())) throw new Error('closed gate was bypassed');
+gateClosed = false;
+if (physics.isCapsuleObstructed('2026', player.position).blocked) throw new Error('open gate still obstructs');
+if (!shift.request('2026').ok) throw new Error('open gate did not allow switch');
+player.teleport(0, 0.92, 20); physics.step();
+if (!shift.request('2126').ok) throw new Error('return to 2126 failed');
+console.log('PASS: critical dynamic barrier blocks relocation when closed and permits switch when open');
+// An ordinary obstruction must not be escaped through an adjacent critical gate.
+const nearWall = physics.world.createCollider(RAPIER.ColliderDesc.cuboid(0.1, 2, 5).setTranslation(200, 1, 0));
+physics.registerDynamicCollider(nearWall, '2026', () => true);
+const protectedGate = physics.world.createCollider(RAPIER.ColliderDesc.cuboid(0.05, 2, 5).setTranslation(200.55, 1, 0));
+physics.registerDynamicCollider(protectedGate, '2026', () => true, true);
+physics.addSolids('2126', [{kind:'box', halfExtents:[0.1,2,5], position:[199.5,1,0], color:0}]);
+physics.step();
+const trapped = physics.findSafeLanding('2126', '2026', {x:200, y:1, z:0}, false);
+if (trapped) throw new Error('landing path bypassed adjacent protected gate');
+console.log('PASS: landing path cannot cross an adjacent protected barrier');
+// At an enclosed target no candidate within search radius is valid.
+physics.addSolids('2026', [{kind:'box', halfExtents:[5,3,5], position:[100,1,0], color:0}]);
+physics.step();
+player.teleport(100, 1, 0); player.velocity.set(1, 2, 3); player.grounded = false;
+const before = player.snapshot();
+const refused = shift.request('2026');
+const after = player.snapshot();
+if (refused.ok || state.currentEra !== '2126' || JSON.stringify(before) !== JSON.stringify(after)) throw new Error('enclosed destination did not preserve state');
+console.log('PASS: enclosed destination refuses safely without changing pose or era');

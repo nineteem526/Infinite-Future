@@ -93,7 +93,7 @@ export class Hud implements HudPort {
           <li><span class="key">F</span><span>拾取 / 放入 / 操作机关</span></li>
           <li><span class="key">R</span><span>重置因果链</span></li>
         </ul>
-        <p class="overlay-note">两个时代已预加载，切换不加载资源、不刷新页面。目标位置被障碍占据时切换会被拒绝；能源晶体是唯一物品，切换、拒绝与重置都不会复制或丢失它。</p>
+        <p class="overlay-note">两个时代已预加载；目标位置被障碍占据时会尝试移至附近安全位置。能源晶体只能携带一件。</p>
         <button type="button" class="enter-button">点击进入测试场</button>
       </div>
     `;
