@@ -104,6 +104,7 @@ export class Game {
     });
 
     this.input.setCallbacks({
+      onInteraction: () => this.audio.ensureStarted(),
       onFirstInteraction: () => {
         this.audio.ensureStarted();
         this.hud.hideOverlay();

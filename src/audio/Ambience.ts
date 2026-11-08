@@ -24,7 +24,15 @@ export class Ambience implements AudioPort {
   private disabled = false;
 
   ensureStarted(): void {
-    if (this.started || this.disabled) return;
+    if (this.disabled) return;
+    // A context created before browser autoplay permission may remain suspended.
+    // Retry from each subsequent real user gesture.
+    if (this.started && this.context) {
+      if (this.context.state === 'suspended') {
+        void this.context.resume().catch(() => undefined);
+      }
+      return;
+    }
 
     const ctor = window.AudioContext
       ?? (window as unknown as { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext;
@@ -36,7 +44,7 @@ export class Ambience implements AudioPort {
     try {
       const context = new ctor();
       const master = context.createGain();
-      master.gain.value = 0.045;
+      master.gain.value = 0.12;
       master.connect(context.destination);
 
       const warm = context.createGain();
@@ -124,7 +132,7 @@ export class Ambience implements AudioPort {
       oscillator.type = 'sawtooth';
       oscillator.frequency.value = frequency;
       const voice = context.createGain();
-      voice.gain.value = 0.07;
+      voice.gain.value = 0.14;
       oscillator.connect(voice);
       voice.connect(filter);
       oscillator.start();

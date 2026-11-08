@@ -2,6 +2,7 @@ import type { LookDelta } from '../core/types';
 
 interface InputCallbacks {
   onFirstInteraction?: () => void;
+  onInteraction?: () => void;
   onPointerLockChange?: (locked: boolean) => void;
 }
 
@@ -150,6 +151,7 @@ export class Input {
   }
 
   private noteInteraction(): void {
+    this.callbacks.onInteraction?.();
     if (this.interacted) return;
     this.interacted = true;
     this.callbacks.onFirstInteraction?.();
