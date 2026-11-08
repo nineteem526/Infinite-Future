@@ -1,0 +1,10 @@
+{
+ "status":"candidate_not_tested_or_locked",
+ "resolution":[1920,1080],"pixel_ratio":1,"vertical_fov_degrees":74,"near":0.05,"far":500,
+ "capture_rules":"Use same renderer, exposure settings and camera transform per comparison; 2026/2126 plaza must use identical world transform. Store commit/dirty state, dimensions, renderer, frame timing, game state, asset versions and environment preset. Validate unobstructed composition and safe locations before locking.",
+ "cameras":[
+  {"id":"gallery","era":"2026","camera_position":[0,1.62,24.8],"look_at":[0,2.2,30.86],"reference":"../光影交错的时光画廊.png","note":"candidate only; existing gallery depth and doors may prevent concept composition"},
+  {"id":"plaza_2026","era":"2026","camera_position":[0,1.62,19.5],"look_at":[0,10.4,-24],"reference":"../暮色钟城广场.png","note":"candidate only; validate line of sight, challenge geometry and cropping"},
+  {"id":"plaza_2126","era":"2126","camera_position":[0,1.62,19.5],"look_at":[0,10.4,-24],"reference":"../末日钟塔广场的黄昏废墟.png","note":"same camera transform as 2026; candidate only"}
+ ]
+}

@@ -2,23 +2,22 @@ import type { Vec3 } from '../core/types';
 import type { CausalityState } from '../m2/types';
 import type { EraId } from '../world/types';
 
-/** Deterministic mainline stages for M3. */
+/** Deterministic mainline stages for the re-planned M3 route. */
 export type StoryStage =
   | 'gallery-intro'
-  | 'district'
+  | 'street'
+  | 'bridge'
+  | 'corridor'
   | 'workshop'
   | 'archive'
   | 'terminal'
   | 'return-gallery'
   | 'complete';
 
-export type PaintingId = 'painting-2026' | 'painting-2126' | 'painting-gallery';
-
 export interface StoryState {
   readonly stage: StoryStage;
-  readonly paintingsViewed: readonly PaintingId[];
-  readonly galleryDoorOpen: boolean;
-  readonly shiftLearned: boolean;
+  readonly timeDeviceAcquired: boolean;
+  readonly airborneShiftUsed: boolean;
   readonly archiveRead: boolean;
   readonly lockdownClosed: boolean;
   readonly firstStrokePainted: boolean;
@@ -26,9 +25,11 @@ export interface StoryState {
 }
 
 export type StoryAction =
-  | { readonly type: 'view-painting'; readonly painting: PaintingId }
   | { readonly type: 'enter-frame' }
-  | { readonly type: 'learn-shift' }
+  | { readonly type: 'acquire-time-device' }
+  | { readonly type: 'record-airborne-shift' }
+  | { readonly type: 'complete-bridge' }
+  | { readonly type: 'cross-corridor' }
   | { readonly type: 'enter-archive' }
   | { readonly type: 'read-archive' }
   | { readonly type: 'close-lockdown' }
@@ -49,11 +50,11 @@ export interface StoryReductionContext {
   readonly causality: CausalityState;
 }
 
+/** Exactly three gallery frames: past painting, future painting, blank canvas. */
 export type StoryTargetId =
   | 'painting-2026'
   | 'painting-2126'
-  | 'painting-gallery'
-  | 'gallery-frame'
+  | 'time-device'
   | 'archive-record'
   | 'terminal-core'
   | 'blank-canvas';

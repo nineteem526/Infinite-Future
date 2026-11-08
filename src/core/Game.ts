@@ -12,6 +12,10 @@ import { Ambience } from '../audio/Ambience';
 import { Input } from '../input/Input';
 import { CausalitySystem } from '../m2/CausalitySystem';
 import { createM2Content, type M2Content } from '../m2/content';
+import { crystalAssetDiagnostics, preloadEnergyCrystal, type CrystalAsset } from '../m2/crystalAsset';
+import { chronoKeyAssetDiagnostics, preloadChronoKey, type ChronoKeyAsset } from '../m2/chronoKeyAsset';
+import { galleryFrameAssetDiagnostics, preloadGalleryFrame, type GalleryFrameAsset } from '../m2/galleryFrameAsset';
+import { preloadGalleryArtwork, type GalleryArtworkSet } from '../m3/galleryArtwork';
 import { createStoryContent, type StoryContent } from '../m3/content';
 import { STORY_SPAWN } from '../m3/layout';
 import { StorySystem } from '../m3/StorySystem';
@@ -20,6 +24,8 @@ import { Physics } from '../physics/Physics';
 import { TimeShift } from '../time/TimeShift';
 import { Hud } from '../ui/Hud';
 import { Era } from '../world/Era';
+import { dressWorld } from '../world/artDirection';
+import { preloadCityBackdrops, addCityBackdrops, type CityBackdrops } from '../world/cityBackdrop';
 import { createEra2026 } from '../world/eras/era2026';
 import { createEra2126 } from '../world/eras/era2126';
 import { otherEra, type EraId } from '../world/types';
@@ -69,10 +75,24 @@ export class Game {
 
   static async create(container: HTMLElement): Promise<Game> {
     await RAPIER.init();
-    return new Game(container);
+    const [crystalAsset, chronoKeyAsset, galleryFrameAsset, galleryArtwork, cityBackdrops] = await Promise.all([
+      preloadEnergyCrystal(),
+      preloadChronoKey(),
+      preloadGalleryFrame(),
+      preloadGalleryArtwork(),
+      preloadCityBackdrops(),
+    ]);
+    return new Game(container, crystalAsset, chronoKeyAsset, galleryFrameAsset, galleryArtwork, cityBackdrops);
   }
 
-  private constructor(container: HTMLElement) {
+  private constructor(
+    container: HTMLElement,
+    crystalAsset: CrystalAsset | null,
+    chronoKeyAsset: ChronoKeyAsset | null,
+    galleryFrameAsset: GalleryFrameAsset | null,
+    galleryArtwork: GalleryArtworkSet,
+    cityBackdrops: CityBackdrops,
+  ) {
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: 'high-performance',
@@ -147,7 +167,11 @@ export class Game {
       eras: this.eras,
       physics: this.physics,
       camera: this.player.camera,
+      crystalAsset,
     });
+    for (const line of crystalAssetDiagnostics()) {
+      console.info('[ART-003]', line);
+    }
     this.causality = new CausalitySystem({
       worldState: this.worldState,
       player: this.player,
@@ -164,7 +188,21 @@ export class Game {
     this.storyContent = createStoryContent({
       eras: this.eras,
       physics: this.physics,
+      chronoKeyAsset,
+      galleryFrameAsset,
+      galleryArtwork,
     });
+    for (const line of chronoKeyAssetDiagnostics()) {
+      console.info('[KEY-001]', line);
+    }
+    for (const line of galleryFrameAssetDiagnostics()) {
+      console.info('[ART-002]', line);
+    }
+    for (const line of galleryArtwork.diagnostics) {
+      console.info('[ART-002-art]', line);
+    }
+    dressWorld(this.eras);
+    addCityBackdrops(this.eras, cityBackdrops);
     this.story = new StorySystem({
       worldState: this.worldState,
       player: this.player,
@@ -270,8 +308,18 @@ export class Game {
     }
 
     // Queued E presses are drained in order; each request is a full transaction.
+    // M3-004: E stays locked until the district time-folding device is obtained,
+    // and successful mid-air switches are reported to the story controller.
     while (this.input.consumeSwitch()) {
-      this.timeShift.request(otherEra(this.worldState.currentEra));
+      if (!this.story.canSwitchEra()) {
+        this.story.rejectEraSwitch();
+        continue;
+      }
+      const airborne = !this.player.grounded;
+      const outcome = this.timeShift.request(otherEra(this.worldState.currentEra));
+      if (outcome.ok) {
+        this.story.notifyEraSwitch(outcome, airborne);
+      }
     }
 
     while (this.input.consumeInteract()) {
@@ -301,3 +349,5 @@ export class Game {
     }
   }
 }
+
+

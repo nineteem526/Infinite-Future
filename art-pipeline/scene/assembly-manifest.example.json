@@ -1,0 +1,11 @@
+{
+  "status": "proposal_not_runtime_config",
+  "source_snapshot": "task/m3-main-story 73d0515 plus uncommitted M3-004 work; source may change",
+  "units": "meters_assumed_from_game_coordinates",
+  "rotation": "Euler XYZ radians",
+  "entries": [
+    {"asset_id":"ENV-COL-001", "glb_path":null, "position":null, "rotation":null, "scale":null, "era":"shared", "visual_parent":"proposal:shared-structure", "collision_reference":null, "interactive_node":null, "status":"planned; per-instance transforms and existing collider references require engineering confirmation"},
+    {"asset_id":"ENV-COL-001-RUIN", "glb_path":null, "position":null, "rotation":null, "scale":null, "era":"2126", "visual_parent":"proposal:era-2126", "collision_reference":null, "interactive_node":null, "status":"planned; overlay must respect existing ruin collision"},
+    {"asset_id":"ENV-CLOCK-001", "glb_path":null, "position":null, "rotation":null, "scale":null, "era":"2026", "visual_parent":"proposal:era-2026", "collision_reference":null, "interactive_node":null, "status":"planned; decorative clock face; dimensions provisional"}
+  ]
+}

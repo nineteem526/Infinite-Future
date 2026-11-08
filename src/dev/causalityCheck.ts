@@ -275,9 +275,9 @@ async function run(): Promise<void> {
   check(gateInfo.era === '2126' && gateInfo.closed && gateInfo.blocksMovement,
     'closed gate collision contract reports era 2126 and blocking state');
 
-  check(physics.countColliders('2026') === 75 + content.staticSolids2026,
+  check(physics.countColliders('2026') === 76 + content.staticSolids2026,
     `2026 collider count includes ${content.staticSolids2026} M2 static solids`);
-  check(physics.countColliders('2126') === 57 + content.staticSolids2126,
+  check(physics.countColliders('2126') === 58 + content.staticSolids2126,
     `2126 collider count includes ${content.staticSolids2126} M2 static solids`);
   check(content.staticSolids2026 >= 5 && content.staticSolids2126 >= 9, 'M2 static geometry is pre-built in both eras');
   check(physics.isCapsuleObstructed('2126', { x: 6, y: STANDING_CENTER_Y, z: 2.2 }).blocked === false,

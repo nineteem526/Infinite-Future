@@ -2,6 +2,11 @@ node_modules/
 dist/
 *.local
 *.glb
+# Explicitly tracked lightweight runtime asset copies (all other *.glb stay ignored).
+!public/assets/art003-energy-crystal-game.glb
+!public/assets/chrono-key-game.glb
+!public/assets/art002-gallery-frame-game.glb
+!public/assets/art002-gallery-frame-game.glb
 *.png
 playwright-report/
 test-results/

@@ -3,21 +3,21 @@ import type { CausalitySystem } from '../m2/CausalitySystem';
 import type { ObjectiveView } from '../m2/types';
 import type { Player } from '../player/Player';
 import type { Physics } from '../physics/Physics';
+import type { SwitchOutcome } from '../time/TimeShift';
 import type { WorldState } from '../world/WorldState';
 import type { StoryContent } from './content';
 import { describeStoryTarget, resolveStoryTarget } from './interaction';
 import {
-  areaLabel,
   FRAME_DESTINATION,
   FRAME_DESTINATION_LABEL,
   FRAME_DESTINATION_YAW,
-  STORY_LAYOUT,
+  GALLERY,
   STORY_TARGETS,
+  STREET,
 } from './layout';
-import { STORY_INTRO_SUBTITLE, storyObjectiveView } from './story';
+import { STORY_INTRO_SUBTITLE, storyObjectiveView, storyStatusView } from './story';
 import type { StoryAction, StoryOutcome, StoryState, StoryTarget } from './types';
 
-/** Minimum view-direction dot product for accepting the blank-canvas paint. */
 const BLANK_CANVAS_FACING_DOT = 0.55;
 
 export interface StoryHudPort {
@@ -37,9 +37,6 @@ export interface StoryDeps {
 }
 
 export interface StoryPresentationSnapshot {
-  readonly galleryDoorCanvas: boolean;
-  readonly galleryDoorObstacle: boolean;
-  readonly galleryDoorHandle: number;
   readonly terminalBarrier: boolean;
   readonly terminalBarrierObstacle: boolean;
   readonly terminalBarrierHandle: number;
@@ -48,12 +45,6 @@ export interface StoryPresentationSnapshot {
   readonly coreEmissive: string;
 }
 
-/**
- * M3 mainline controller. It owns the deterministic stage machine, story
- * interactions, narrative subtitles and the two story-gated dynamic colliders.
- * Item/causality state stays in WorldState (M2); this controller only submits
- * StoryActions and reflects the resulting state in presentation and HUD.
- */
 export class StorySystem {
   private readonly worldState: WorldState;
   private readonly player: Player;
@@ -66,7 +57,7 @@ export class StorySystem {
   private lastObjectiveKey = '';
   private lastPrompt: string | null = null;
   private lastSubtitle: string | null = null;
-  private districtSerialBaseline = 0;
+  private passageOpenNotified = false;
   private outcome: StoryOutcome | null = null;
 
   constructor(deps: StoryDeps) {
@@ -77,19 +68,22 @@ export class StorySystem {
     this.content = deps.content;
     this.causality = deps.causality;
 
-    // Story-gated, protected dynamic obstacles: gallery frame door (2026) and
-    // terminal lockdown barrier (2126). Physics includes them in movement and
-    // time-shift safety queries while their story flag is closed.
-    deps.physics.registerDynamicCollider(
-      this.content.galleryDoorCollider,
-      '2026',
-      () => !this.worldState.story.galleryDoorOpen,
-      true,
-    );
     deps.physics.registerDynamicCollider(
       this.content.terminalBarrierCollider,
       '2126',
       () => !this.worldState.story.archiveRead,
+      true,
+    );
+    deps.physics.registerDynamicCollider(
+      this.content.bridgeWallCollider,
+      '2126',
+      () => true,
+      true,
+    );
+    deps.physics.registerDynamicCollider(
+      this.content.corridorCollapseCollider,
+      '2126',
+      () => true,
       true,
     );
 
@@ -114,50 +108,75 @@ export class StorySystem {
     return this.subtitleText;
   }
 
-  area(): string {
-    return areaLabel(this.worldState.currentEra, this.player.position);
-  }
-
   statusLine(): string {
-    const story = this.worldState.story;
-    const area = this.area();
-    switch (story.stage) {
-      case 'gallery-intro':
-        return `地点：最后的画廊 · 已观察 ${story.paintingsViewed.length}/3`;
-      case 'district':
-        return `地点：${area} · 按 E 切换时代`;
-      case 'workshop':
-      case 'archive':
-        return `地点：${area} · ${this.causality.status()}`;
-      case 'terminal':
-        return `地点：${area} · 时间封锁：维持中`;
-      case 'return-gallery':
-        return `地点：${area} · 中央画布等待第一笔颜色`;
-      case 'complete':
-        return '主线完成 · The future is not written.';
-    }
+    return storyStatusView(this.worldState.story.stage);
   }
 
   targets(): readonly StoryTarget[] {
     return STORY_TARGETS;
   }
 
-  /** Fixed painting-teleport destination (deterministic, never player-chosen). */
   frameDestination(): { readonly x: number; readonly y: number; readonly z: number } {
     return FRAME_DESTINATION;
   }
 
-  /** True when the fixed destination is an unobstructed, supported landing. */
   frameDestinationSafe(): boolean {
     const report = this.physics.isCapsuleObstructed('2026', FRAME_DESTINATION);
     return !report.blocked && this.physics.hasSupport('2026', FRAME_DESTINATION);
   }
 
-  /**
-   * Ending-only orientation gate: the player must actually face the blank
-   * canvas to receive the paint prompt / accept F. This deliberately applies to
-   * the blank canvas only; all other story interactions keep proximity rules.
-   */
+  /** E is locked only while the player is in the street before the device. */
+  canSwitchEra(): boolean {
+    return this.worldState.story.stage !== 'street';
+  }
+
+  rejectEraSwitch(): void {
+    this.hud.showToast('折时仪尚未取得：无法稳定切换时代', 'info');
+    this.updateHud(true);
+  }
+
+  /** Kept for Game API compatibility; also records the airborne bridge switch. */
+  notifyEraSwitch(outcome: SwitchOutcome, airborne: boolean): void {
+    if (!outcome.ok || !airborne) return;
+    if (this.worldState.story.stage !== 'bridge') return;
+    if (this.worldState.currentEra !== '2126') return;
+    const { x, z } = this.player.position;
+    if (x < 40 || x > 48 || z < 8 || z > 14) return;
+    this.applyAction({ type: 'record-airborne-shift' }, true);
+  }
+
+  private inStreetGap(): boolean {
+    const { x, z } = this.player.position;
+    return x >= STREET.bridge.gap.minX
+      && x <= STREET.bridge.gap.maxX
+      && z >= 8
+      && z <= 14;
+  }
+
+  private inBridgeLandingZone(): boolean {
+    const { x, z } = this.player.position;
+    return x >= 40 && x <= 42.3 && z >= 8 && z <= 14;
+  }
+
+  private inCorridorCheckpoint(): boolean {
+    const { x, z } = this.player.position;
+    return x <= 33.5 && z >= 8 && z <= 14;
+  }
+
+  private tryRecoverFromFall(): boolean {
+    if (this.worldState.story.stage !== 'bridge') return false;
+    if (!this.player.grounded) return false;
+    if (this.player.position.y > 1.2) return false;
+    if (!this.inStreetGap()) return false;
+
+    this.player.teleport(STREET.bridge.retryX, 1.52, 11, Math.PI / 2, 0);
+    this.player.syncCamera();
+    this.hud.showToast('跌落：回到桥边重试', 'info');
+    this.setSubtitle('你跌回了街道。');
+    this.updateHud(true);
+    return true;
+  }
+
   facesBlankCanvas(): boolean {
     if (this.worldState.story.stage !== 'return-gallery') return false;
     const target = resolveStoryTarget(this.worldState.currentEra, this.player.position);
@@ -166,9 +185,9 @@ export class StorySystem {
     const eyeX = this.player.position.x;
     const eyeY = this.player.position.y - PLAYER_TOTAL_HALF_HEIGHT + EYE_HEIGHT;
     const eyeZ = this.player.position.z;
-    const dx = STORY_LAYOUT.blankCanvas.x - eyeX;
-    const dy = STORY_LAYOUT.blankCanvas.y - eyeY;
-    const dz = STORY_LAYOUT.blankCanvas.z - eyeZ;
+    const dx = GALLERY.blankCanvas.x - eyeX;
+    const dy = GALLERY.blankCanvas.y - eyeY;
+    const dz = GALLERY.blankCanvas.z - eyeZ;
     const distance = Math.hypot(dx, dy, dz);
     if (distance < 1e-6) return false;
 
@@ -193,16 +212,12 @@ export class StorySystem {
     return describeStoryTarget(target, this.worldState.story, this.worldState.causality).prompt;
   }
 
-  /** HUD prompt: story targets take precedence, otherwise M2's prompt is kept. */
   effectivePrompt(): string | null {
     return this.storyPrompt() ?? this.causality.promptForCurrentPosition();
   }
 
   presentation(): StoryPresentationSnapshot {
     return {
-      galleryDoorCanvas: this.content.galleryDoorCanvas.visible,
-      galleryDoorObstacle: !this.worldState.story.galleryDoorOpen,
-      galleryDoorHandle: this.content.galleryDoorHandle,
       terminalBarrier: this.content.terminalBarrierMesh.visible,
       terminalBarrierObstacle: !this.worldState.story.archiveRead,
       terminalBarrierHandle: this.content.terminalBarrierHandle,
@@ -217,8 +232,6 @@ export class StorySystem {
     const target = resolveStoryTarget(this.worldState.currentEra, this.player.position);
     if (!target) return false;
 
-    // Ending interaction: proximity alone is not enough; the camera must point
-    // at the blank canvas, otherwise F only gives natural guidance.
     if (
       target.id === 'blank-canvas'
       && this.worldState.story.stage === 'return-gallery'
@@ -240,14 +253,10 @@ export class StorySystem {
       return true;
     }
 
-    // The central-frame painting teleport validates its fixed destination before
-    // committing any state. A blocked/unsupported destination aborts the whole
-    // transaction (door stays closed, stage unchanged) and reports where it was
-    // trying to go. This is a painting interaction, not an E time-shift.
     if (description.action.type === 'enter-frame') {
       if (!this.frameDestinationSafe()) {
         this.hud.showToast(
-          `画框传送失败：目的地【${FRAME_DESTINATION_LABEL}】被占据或悬空，请先清理落点`,
+          `画框传送失败：目的地【${FRAME_DESTINATION_LABEL}】被占据或悬空`,
           'error',
         );
         this.updateHud(true);
@@ -265,7 +274,6 @@ export class StorySystem {
     return true;
   }
 
-  /** Deterministic painting-teleport arrival; only used by enter-frame. */
   private teleportThroughFrame(): void {
     this.player.teleport(
       FRAME_DESTINATION.x,
@@ -275,41 +283,46 @@ export class StorySystem {
       0,
     );
     this.player.syncCamera();
-    this.districtSerialBaseline = this.worldState.switchSerial;
     this.updateHud(true);
   }
 
-  /** Per-fixed-step hook: deterministic stage transitions and HUD refresh. */
   tick(): void {
-    for (let guard = 0; guard < 4; guard += 1) {
-      const story = this.worldState.story;
+    this.tryRecoverFromFall();
 
-      if (story.stage === 'district' && this.worldState.switchSerial > this.districtSerialBaseline) {
-        this.applyAction({ type: 'learn-shift' }, true);
-        continue;
-      }
+    const story = this.worldState.story;
+    if (story.stage === 'bridge' && story.airborneShiftUsed && this.inBridgeLandingZone()) {
+      this.applyAction({ type: 'complete-bridge' }, true);
+    }
+    if (this.worldState.story.stage === 'corridor' && this.inCorridorCheckpoint()) {
+      this.applyAction({ type: 'cross-corridor' }, true);
+    }
 
-      if (story.stage === 'workshop' && this.worldState.causality.chamberVisited) {
-        this.applyAction({ type: 'enter-archive' }, true);
-        continue;
-      }
+    if (
+      this.worldState.story.stage === 'workshop'
+      && this.worldState.causality.futureGateOpen
+      && !this.worldState.causality.chamberVisited
+      && !this.passageOpenNotified
+    ) {
+      this.passageOpenNotified = true;
+      this.setSubtitle('西侧通道已打开。');
+    }
 
-      break;
+    if (this.worldState.story.stage === 'workshop' && this.worldState.causality.chamberVisited) {
+      this.applyAction({ type: 'enter-archive' }, true);
     }
 
     this.updateHud(false);
   }
 
-  /** Restart the whole mainline from the gallery intro. */
   resetRun(): void {
     this.causality.resetRun();
     this.worldState.resetStory();
-    this.districtSerialBaseline = this.worldState.switchSerial;
     this.outcome = null;
+    this.passageOpenNotified = false;
     this.syncPresentation();
     this.setSubtitle(STORY_INTRO_SUBTITLE);
     this.updateHud(true);
-    this.hud.showToast('已重新开始主线：回到最后的画廊', 'info');
+    this.hud.showToast('已重新开始主线：回到画廊', 'info');
   }
 
   private applyAction(action: StoryAction, silent: boolean): StoryOutcome {
@@ -337,11 +350,12 @@ export class StorySystem {
 
   private syncPresentation(): void {
     const story = this.worldState.story;
-    this.content.galleryDoorCanvas.visible = !story.galleryDoorOpen;
     this.content.terminalBarrierMesh.visible = !story.archiveRead;
     this.content.paintStroke.visible = story.firstStrokePainted;
     this.content.archiveGlyphMaterial.emissiveIntensity = story.archiveRead ? 1.0 : 0.55;
     this.content.archiveGlyphMaterial.needsUpdate = true;
+    this.content.setArchiveRead(story.archiveRead);
+    this.content.setPassageOpen(this.worldState.causality.futureGateOpen);
     this.content.setLockdownClosed(story.lockdownClosed);
   }
 

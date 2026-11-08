@@ -6,6 +6,7 @@ import type { Physics } from '../physics/Physics';
 import type { Era } from '../world/Era';
 import { addSolidVisuals, createSolidVisual, decoBox, decoCylinder } from '../world/geometry';
 import type { EraId, SolidSpec } from '../world/types';
+import type { CrystalAsset, CrystalAssetStats } from './crystalAsset';
 import { GATE_SLAB, M2_LAYOUT } from './layout';
 
 const MACHINE = 0x6d6455;
@@ -49,6 +50,8 @@ export interface M2ContentDeps {
   readonly eras: ReadonlyMap<EraId, Era>;
   readonly physics: Physics;
   readonly camera: THREE.PerspectiveCamera;
+  /** Preloaded optimized ART-003 local copy, or null to keep placeholder visuals. */
+  readonly crystalAsset?: CrystalAsset | null;
 }
 
 /**
@@ -76,6 +79,9 @@ export interface M2Content {
   readonly socketCrystal: THREE.Object3D;
   readonly generatorGlow: THREE.Object3D;
   readonly chamberMarker: THREE.Object3D;
+  /** Whether the three crystal containers use the optimized GLB or placeholders. */
+  readonly crystalVisualSource: 'glb' | 'placeholder';
+  readonly crystalAssetStats: CrystalAssetStats | null;
   readonly staticSolids2026: number;
   readonly staticSolids2126: number;
 }
@@ -137,17 +143,42 @@ export function createM2Content(deps: M2ContentDeps): M2Content {
       .setRestitution(0),
   );
 
-  const worldCrystal = createCrystalMesh(1);
-  worldCrystal.position.set(...point(M2_LAYOUT.crystalWorld));
+  const crystalAsset = deps.crystalAsset ?? null;
+  const makeCrystalContainer = (
+    name: string,
+    scale: number,
+    position: Vec3Tuple,
+    rotation?: Vec3Tuple,
+  ): THREE.Group => {
+    const container = new THREE.Group();
+    container.name = name;
+    container.add(
+      crystalAsset !== null
+        ? crystalAsset.createInstance(scale)
+        : createCrystalMesh(scale),
+    );
+    container.position.set(...position);
+    if (rotation) container.rotation.set(...rotation);
+    container.visible = false;
+    return container;
+  };
+
+  const worldCrystal = makeCrystalContainer('crystal-world', 1, point(M2_LAYOUT.crystalWorld));
   era2126.group.add(worldCrystal);
 
-  const socketCrystal = createCrystalMesh(0.85);
-  socketCrystal.position.set(...point(M2_LAYOUT.generatorSocket));
+  const socketCrystal = makeCrystalContainer(
+    'crystal-socket',
+    0.85,
+    point(M2_LAYOUT.generatorSocket),
+  );
   era2026.group.add(socketCrystal);
 
-  const carriedCrystal = createCrystalMesh(0.62);
-  carriedCrystal.position.set(0.32, -0.24, -0.6);
-  carriedCrystal.rotation.set(0.2, 0.4, 0);
+  const carriedCrystal = makeCrystalContainer(
+    'crystal-carried',
+    0.62,
+    [0.32, -0.24, -0.6],
+    [0.2, 0.4, 0],
+  );
   deps.camera.add(carriedCrystal);
 
   // Empty socket collar on the generator front.
@@ -239,6 +270,8 @@ export function createM2Content(deps: M2ContentDeps): M2Content {
     socketCrystal,
     generatorGlow,
     chamberMarker,
+    crystalVisualSource: crystalAsset !== null ? 'glb' : 'placeholder',
+    crystalAssetStats: crystalAsset?.stats ?? null,
     staticSolids2026: solids2026.length,
     staticSolids2126: solids2126.length,
   };

@@ -186,7 +186,9 @@ export function createEra2126(): EraBuild {
     { from: -32.6, to: -20, height: 2.4 },
     { from: -20, to: -8, height: 3.0 },
     { from: -8, to: 2, height: 2.2 },
-    { from: 2, to: 16, height: 3.4 },
+    { from: 2, to: 8, height: 3.4 },
+    // M3-005 east gateway gap z=8..14 into the outer street district.
+    { from: 14, to: 16, height: 2.8 },
     { from: 16, to: 32.6, height: 2.6 },
   ]);
 
@@ -322,21 +324,21 @@ export function createEra2126(): EraBuild {
     lighting: {
       background: 0x39414a,
       fogColor: 0x4a535d,
-      fogDensity: 0.0105,
-      exposure: 0.92,
+      fogDensity: 0.0082,
+      exposure: 1.05,
       sun: {
         color: 0xa8bfd6,
-        intensity: 0.85,
+        intensity: 1.15,
         position: [-28, 42, -34],
       },
       hemi: {
         skyColor: 0x6c7c8e,
         groundColor: 0x25272b,
-        intensity: 0.6,
+        intensity: 0.8,
       },
       ambient: {
         color: 0x1f2933,
-        intensity: 0.4,
+        intensity: 0.55,
       },
     },
     solids,
@@ -461,7 +463,7 @@ export function createEra2126(): EraBuild {
       // Cold skyline silhouettes.
       for (let i = 0; i < 18; i += 1) {
         const angle = (i / 18) * TWO_PI + 0.18;
-        const radius = 50 + ((i * 9) % 25);
+        const radius = 92 + ((i * 9) % 26);
         const width = 6 + ((i * 5) % 7);
         const depth = 6 + ((i * 3) % 8);
         const height = 9 + ((i * 13) % 31);

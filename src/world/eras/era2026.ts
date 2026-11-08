@@ -93,8 +93,17 @@ function addPerimeter(solids: SolidSpec[]): void {
   });
   solids.push({
     kind: 'box',
-    halfExtents: [0.6, 1.2, 32],
-    position: [32, 1.2, 0],
+    halfExtents: [0.6, 1.2, 20.3],
+    position: [32, 1.2, -12.3],
+    color: WALL,
+    roughness: 0.95,
+    metalness: 0,
+  });
+  // M3-005 east gateway: walkable opening to the added outer street district.
+  solids.push({
+    kind: 'box',
+    halfExtents: [0.6, 1.2, 9.3],
+    position: [32, 1.2, 23.3],
     color: WALL,
     roughness: 0.95,
     metalness: 0,
@@ -309,7 +318,7 @@ export function createEra2026(): EraBuild {
     lighting: {
       background: 0xd8b98a,
       fogColor: 0xcfb184,
-      fogDensity: 0.006,
+      fogDensity: 0.0052,
       exposure: 1.12,
       sun: {
         color: 0xffd7a0,
@@ -454,7 +463,7 @@ export function createEra2026(): EraBuild {
       // Distant skyline silhouettes beyond the balustrade.
       for (let i = 0; i < 18; i += 1) {
         const angle = (i / 18) * TWO_PI + 0.12;
-        const radius = 52 + ((i * 7) % 23);
+        const radius = 92 + ((i * 9) % 26);
         const width = 5 + ((i * 3) % 6);
         const depth = 5 + ((i * 5) % 7);
         const height = 11 + ((i * 11) % 25);

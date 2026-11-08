@@ -11,7 +11,8 @@
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "test:m1": "node src/dev/runCheck.mjs src/dev/headlessCheck.ts",
     "test:causality": "node src/dev/runCheck.mjs src/dev/causalityCheck.ts",
-    "test:story": "node src/dev/runCheck.mjs src/dev/storyCheck.ts"
+    "test:story": "node src/dev/runCheck.mjs src/dev/mainlineCheck.ts",
+    "test:asset": "node src/dev/crystalAssetCheck.mjs"
   },
   "keywords": [],
   "author": "",
