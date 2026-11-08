@@ -22,8 +22,9 @@ export function resolveInteractionTarget(
   for (const target of M2_TARGETS) {
     if (target.era !== era) continue;
     const dx = playerPosition.x - target.anchor.x;
+    const dy = playerPosition.y - target.anchor.y;
     const dz = playerPosition.z - target.anchor.z;
-    const distanceSq = dx * dx + dz * dz;
+    const distanceSq = dx * dx + dy * dy + dz * dz;
     if (distanceSq > target.radius * target.radius) continue;
     // Strictly smaller keeps tie-breaking deterministic by M2_TARGETS order.
     if (distanceSq < bestDistanceSq) {

@@ -72,11 +72,8 @@ function isInsideChamber(position: Vec3): boolean {
  * M2 controller: resolves interaction intents (read-only), delegates every state
  * change to WorldState's pure reducer, then commits presentation atomically.
  *
- * The dynamic future gate slab collider is owned here rather than by Physics, so
- * M1's time-shift/safety code stays untouched. It is included in player movement
- * via Player.setExtraObstacleFilter while the gate is closed; the slab footprint
- * overlaps 2026's fountain basin, so no legal 2026 standing spot can switch into
- * the closed slab. No safety-probe change is required for this layout.
+ * The future gate's active state is exposed for Physics registration. The game
+ * registers it as a protected 2126 obstacle for movement and time-shift checks.
  */
 export class CausalitySystem {
   private readonly worldState: WorldState;

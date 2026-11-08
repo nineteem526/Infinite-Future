@@ -2,6 +2,7 @@ import './style.css';
 import { Game } from './core/Game';
 import { installTestApi } from './dev/TestApi';
 import { installBrowserAcceptance } from './dev/browserAcceptance';
+import { installM2Acceptance } from './dev/m2BrowserAcceptance';
 
 const errors: string[] = [];
 
@@ -38,6 +39,9 @@ async function main(): Promise<void> {
   installTestApi(game, errors);
   if (new URLSearchParams(window.location.search).has('acceptance') && window.__M1_TEST__) {
     installBrowserAcceptance(window.__M1_TEST__);
+  }
+  if (new URLSearchParams(window.location.search).has('m2acceptance') && window.__M2_TEST__) {
+    installM2Acceptance(window.__M2_TEST__);
   }
   window.__M1_READY__ = true;
 }

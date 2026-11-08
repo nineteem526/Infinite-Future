@@ -1,3 +1,4 @@
+import { resolveInteractionTarget } from '../m2/interaction';
 /**
  * Deterministic M2-001 regression check (no DOM, no WebGL, no browser tooling).
  *
@@ -198,6 +199,7 @@ async function run(): Promise<void> {
     content,
     spawn: { position: { x: 0, y: 1.2, z: 20 }, yaw: 0, pitch: 0 },
   });
+  physics.registerDynamicCollider(content.gateCollider, '2126', () => causality.gateObstacleActive(), true);
 
   // Warm the query pipeline and broad phase exactly like Game does.
   physics.step(FIXED_DT);
@@ -256,6 +258,14 @@ async function run(): Promise<void> {
     'exactly one crystal visual is visible (world)');
   check(presentation.gateSlab && !presentation.gateOpenGlow, 'future gate starts closed (slab visible, glow hidden)');
   check(presentation.gateObstacle, 'closed gate collider is active for movement');
+  check(resolveInteractionTarget('2126', {x:6, y:15, z:0}) === null, 'interaction cannot reach a target far above or below');
+  check(physics.isCapsuleObstructed('2126', {x:-18, y:1.9, z:0}).protectedObstacle, 'closed future gate is a protected time-shift obstacle');
+  player.teleport(-18, 1.9, 0);
+  const closedPose = player.snapshot();
+  const gateShift = timeShift.request('2126');
+  check(!gateShift.ok && worldState.currentEra === '2026', 'closed gate prevents switching into its occupied space');
+  check(JSON.stringify(player.snapshot()) === JSON.stringify(closedPose), 'closed-gate rejection preserves pose and velocity');
+  player.teleport(0, 1.2, 20);
   check(!presentation.generatorGlow && !presentation.socketCrystal && !presentation.carriedCrystal,
     'generator/socket/carried visuals start hidden');
   const gateInfo = causality.gateCollision();
@@ -266,7 +276,7 @@ async function run(): Promise<void> {
 
   check(physics.countColliders('2026') === 75 + content.staticSolids2026,
     `2026 collider count includes ${content.staticSolids2026} M2 static solids`);
-  check(physics.countColliders('2126') === 56 + content.staticSolids2126,
+  check(physics.countColliders('2126') === 57 + content.staticSolids2126,
     `2126 collider count includes ${content.staticSolids2126} M2 static solids`);
   check(content.staticSolids2026 >= 5 && content.staticSolids2126 >= 9, 'M2 static geometry is pre-built in both eras');
   check(physics.isCapsuleObstructed('2126', { x: 6, y: STANDING_CENTER_Y, z: 2.2 }).blocked === false,
@@ -297,9 +307,10 @@ async function run(): Promise<void> {
   teleport(0, STANDING_CENTER_Y + 0.02, 6, 0);
   fake.switchQueued += 1;
   simulate(2);
-  check(worldState.currentEra === '2026', 'M1 regression: switching into the 2126 rubble wall is still rejected');
-  check(hudState.toast.includes('拒绝'), 'M1 regression: rejection still produces HUD feedback');
-  check(fingerprint(worldState.causality) === initialFingerprint, 'M1 regression: rejected switch does not touch causal state');
+  check(worldState.currentEra === '2126', 'M1 regression: switching into rubble uses a safe nearby landing');
+  check(hudState.toast.includes('避开'), 'M1 regression: safe adjustment produces HUD feedback');
+  check(fingerprint(worldState.causality) === initialFingerprint, 'M1 regression: adjusted switch does not touch causal state');
+  check(switchAtSpawn('2026'), 'return to 2026 before rapid switches');
 
   teleport(0, STANDING_CENTER_Y + 0.02, 20, 0);
   simulate(10);
@@ -360,7 +371,7 @@ async function run(): Promise<void> {
   fake.switchQueued += 1;
   simulate(2);
   check(worldState.currentEra === '2126', 'rejected switch while holding keeps 2126 active');
-  check(hudState.toast.includes('拒绝'), 'rejected switch while holding reports feedback');
+  check(hudState.toast.includes('安全落点'), 'rejected switch while holding reports feedback');
   check(fingerprint(worldState.causality) === afterPickup, 'rejected switch does not duplicate or lose the held crystal');
 
   // --- 7. carry crystal to 2026 -----------------------------------------
@@ -409,6 +420,7 @@ async function run(): Promise<void> {
   presentation = causality.presentation();
   check(!presentation.gateSlab && presentation.gateOpenGlow, 'gate slab hides and open glow appears');
   check(!presentation.gateObstacle, 'gate collider gating follows the causal state');
+  check(!physics.isCapsuleObstructed('2126', {x:-18, y:1.9, z:0}).protectedObstacle, 'open future gate no longer blocks time-shift queries');
   check(causality.gateCollision().closed === false && causality.gateCollision().blocksMovement === false,
     'gate collision contract reports open/non-blocking after activation');
   check(hudState.objective?.step === 4, 'HUD objective advances to step 4');

@@ -152,6 +152,9 @@ export class Game {
       content: this.m2Content,
       spawn: this.spawn,
     });
+    this.physics.registerDynamicCollider(
+      this.m2Content.gateCollider, '2126', () => this.causality.gateObstacleActive(), true,
+    );
 
     window.addEventListener('resize', this.handleResize);
     this.handleResize();
