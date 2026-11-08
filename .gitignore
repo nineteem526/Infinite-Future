@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.local
+*.glb
+*.png
+playwright-report/
+test-results/
