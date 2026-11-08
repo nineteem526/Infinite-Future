@@ -218,6 +218,9 @@ export class Game {
         : this.smoothedFps * 0.9 + instantaneous * 0.1;
     }
 
+    // Consume mouse input for every rendered frame, including frames with no
+    // fixed physics step; movement uses the latest view direction below.
+    this.player.updateLook(this.input);
     this.accumulator += frameTime;
     let steps = 0;
     while (this.accumulator >= FIXED_DT && steps < MAX_SUBSTEPS) {

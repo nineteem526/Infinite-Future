@@ -152,6 +152,7 @@ async function run(): Promise<void> {
       while (fake.consumeSwitch()) {
         timeShift.request(otherEra(worldState.currentEra));
       }
+      player.updateLook(input);
       player.update(FIXED_DT, input, worldState.currentEra);
       physics.step(FIXED_DT);
       player.afterPhysicsStep();

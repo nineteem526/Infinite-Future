@@ -1,5 +1,8 @@
 import type { LookDelta } from '../core/types';
 
+// Bound an abnormally large input burst without changing ordinary mouse movement.
+const MAX_LOOK_BURST = 360;
+
 interface InputCallbacks {
   onFirstInteraction?: () => void;
   onInteraction?: () => void;
@@ -125,14 +128,29 @@ export class Input {
       this.keys.delete(event.code);
     };
 
+    const clearLook = () => {
+      this.lookX = 0;
+      this.lookY = 0;
+    };
+
     const onBlur = () => {
       this.keys.clear();
+      clearLook();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) onBlur();
     };
 
     const onMouseMove = (event: MouseEvent) => {
       if (!this.pointerLocked && !this.lookEventsAllowed) return;
-      this.lookX += event.movementX;
-      this.lookY += event.movementY;
+      if (!Number.isFinite(event.movementX) || !Number.isFinite(event.movementY)) return;
+      const x = this.lookX + event.movementX;
+      const y = this.lookY + event.movementY;
+      const magnitude = Math.hypot(x, y);
+      const scale = magnitude > MAX_LOOK_BURST ? MAX_LOOK_BURST / magnitude : 1;
+      this.lookX = x * scale;
+      this.lookY = y * scale;
     };
 
     const onCanvasClick = () => {
@@ -142,12 +160,14 @@ export class Input {
 
     const onPointerLockChange = () => {
       const locked = document.pointerLockElement === this.canvas;
+      if (this.pointerLocked !== locked) clearLook();
       this.pointerLocked = locked;
       this.callbacks.onPointerLockChange?.(locked);
     };
 
     const onPointerLockError = () => {
       this.pointerLocked = false;
+      clearLook();
       this.callbacks.onPointerLockChange?.(false);
     };
 
@@ -159,6 +179,7 @@ export class Input {
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
     document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     document.addEventListener('pointerlockchange', onPointerLockChange);
     document.addEventListener('pointerlockerror', onPointerLockError);
     this.canvas.addEventListener('click', onCanvasClick);
@@ -169,6 +190,7 @@ export class Input {
       () => window.removeEventListener('keyup', onKeyUp),
       () => window.removeEventListener('blur', onBlur),
       () => document.removeEventListener('mousemove', onMouseMove),
+      () => document.removeEventListener('visibilitychange', onVisibilityChange),
       () => document.removeEventListener('pointerlockchange', onPointerLockChange),
       () => document.removeEventListener('pointerlockerror', onPointerLockError),
       () => this.canvas.removeEventListener('click', onCanvasClick),

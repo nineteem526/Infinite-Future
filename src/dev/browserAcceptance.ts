@@ -49,6 +49,15 @@ export function installBrowserAcceptance(api: M1TestApi): void {
       const shifted = api.state();
       check(shifted.era === '2126' && shifted.pose.velocity.y > 0 && shifted.pose.position.y >= fromY, '空中切换后继续上升');
       check(shifted.visibleEra === '2126' && shifted.audio.era === '2126', '画面和音频时代一致');
+      const yawBefore = api.state().pose.yaw;
+      api.look(40, 0);
+      await waitFor(() => api.state().pose.yaw !== yawBefore);
+      const yawAfter = api.state().pose.yaw;
+      check(Math.abs((yawAfter - yawBefore) + 0.088) < 0.00001, '正常鼠标转向在画面更新时生效');
+      api.look(5000, 0);
+      await waitFor(() => api.state().pose.yaw !== yawAfter);
+      const burst = Math.abs(api.state().pose.yaw - yawAfter);
+      check(burst <= 0.793 && burst > 0, '异常鼠标尖峰受到限制');
       check(shifted.errors.length === 0, '无运行时异常');
       result.textContent = checks.join('\n') + '\nBROWSER ACCEPTANCE PASSED';
     } catch (error) {

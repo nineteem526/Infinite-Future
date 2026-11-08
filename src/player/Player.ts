@@ -75,14 +75,17 @@ export class Player {
     this.syncCamera();
   }
 
-  /** Advances movement by one fixed physics step; call before Physics.step. */
-  update(dt: number, input: Input, era: EraId): void {
+  /** Apply view input once per rendered frame for responsive camera motion. */
+  updateLook(input: Input): void {
     const look = input.consumeLook();
     if (look.x !== 0 || look.y !== 0) {
       this.yaw -= look.x * MOUSE_SENSITIVITY;
       this.pitch = clamp(this.pitch - look.y * MOUSE_SENSITIVITY, -MAX_PITCH, MAX_PITCH);
     }
+  }
 
+  /** Advances movement by one fixed physics step; call before Physics.step. */
+  update(dt: number, input: Input, era: EraId): void {
     if (input.consumeJump()) {
       this.jumpBuffer = JUMP_BUFFER_SECONDS;
     }

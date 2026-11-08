@@ -217,6 +217,7 @@ async function run(): Promise<void> {
       while (fake.consumeInteract()) {
         causality.interact();
       }
+      player.updateLook(input);
       player.update(FIXED_DT, input, worldState.currentEra);
       physics.step(FIXED_DT);
       player.afterPhysicsStep();
