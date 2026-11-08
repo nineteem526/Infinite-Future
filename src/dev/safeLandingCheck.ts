@@ -44,6 +44,16 @@ if (!shift.request('2026').ok) throw new Error('open gate did not allow switch')
 player.teleport(0, 0.92, 20); physics.step();
 if (!shift.request('2126').ok) throw new Error('return to 2126 failed');
 console.log('PASS: critical dynamic barrier blocks relocation when closed and permits switch when open');
+// An ordinary obstruction must not be escaped through an adjacent critical gate.
+const nearWall = physics.world.createCollider(RAPIER.ColliderDesc.cuboid(0.1, 2, 5).setTranslation(200, 1, 0));
+physics.registerDynamicCollider(nearWall, '2026', () => true);
+const protectedGate = physics.world.createCollider(RAPIER.ColliderDesc.cuboid(0.05, 2, 5).setTranslation(200.55, 1, 0));
+physics.registerDynamicCollider(protectedGate, '2026', () => true, true);
+physics.addSolids('2126', [{kind:'box', halfExtents:[0.1,2,5], position:[199.5,1,0], color:0}]);
+physics.step();
+const trapped = physics.findSafeLanding('2126', '2026', {x:200, y:1, z:0}, false);
+if (trapped) throw new Error('landing path bypassed adjacent protected gate');
+console.log('PASS: landing path cannot cross an adjacent protected barrier');
 // At an enclosed target no candidate within search radius is valid.
 physics.addSolids('2026', [{kind:'box', halfExtents:[5,3,5], position:[100,1,0], color:0}]);
 physics.step();

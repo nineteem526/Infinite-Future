@@ -178,7 +178,9 @@ export class Physics {
         const samples = Math.ceil(radius / 0.2);
         for (let i = 1; i <= samples; i += 1) {
           const t = i / samples;
-          if (this.isCapsuleObstructed(source, { x: center.x + dx * t, y: center.y, z: center.z + dz * t }).blocked) {
+          const sample = { x: center.x + dx * t, y: center.y, z: center.z + dz * t };
+          if (this.isCapsuleObstructed(source, sample).blocked
+            || this.isCapsuleObstructed(target, sample).protectedObstacle) {
             pathClear = false;
             break;
           }
